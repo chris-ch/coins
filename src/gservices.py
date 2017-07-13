@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 import httplib2
 from apiclient import discovery
 from gspread.utils import rowcol_to_a1
