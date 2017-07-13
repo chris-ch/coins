@@ -7,7 +7,7 @@ import pandas
 import gspread
 
 from cryptocompare import load_crypto_compare_data
-from gservices import setup_services, file_by_id, update_sheet, load_sheet, authorize_services, update_sheet2
+from gservices import update_sheet, authorize_services
 
 _DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE = os.sep.join(('.', 'google-service-account-creds.json'))
 _DEFAULT_CONFIG_FILE = os.sep.join(('.', 'config.json'))
@@ -18,19 +18,7 @@ def process_spreadsheet(credentials_file, spreadsheet_id, prices):
     svc_sheet = gspread.authorize(credentials)
     header = [field for field in prices.reset_index().columns.tolist() if field != 'index']
     records = prices.to_dict(orient='records')
-    numbers_flag = [field for field in header if field != 'date']
-    update_sheet2(svc_sheet, spreadsheet_id, header, records)
-    return
-    svc_drive, svc_sheets = setup_services(credentials)
-    spreadsheet_name = file_by_id(svc_drive, spreadsheet_id)
-    logging.info('prepared Google sheet %s: %s', spreadsheet_name, spreadsheet_id)
-    header = [field for field in prices.reset_index().columns.tolist() if field != 'index']
-    records = prices.to_dict(orient='records')
-    numbers_flag = [field for field in header if field != 'date']
-    update_sheet(svc_sheets, spreadsheet_id, header, records, date_columns=('date', ), number_columns=numbers_flag)
-    logging.info('saved sheet %s', spreadsheet_name)
-    values = load_sheet(svc_sheets, spreadsheet_id)
-    print(values)
+    update_sheet(svc_sheet, spreadsheet_id, header, records)
 
 
 def main():

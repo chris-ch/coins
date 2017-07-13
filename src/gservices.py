@@ -8,7 +8,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 _GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
 _GOOGLE_DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 _SHEET_TAB_PRICES = 'Prices'
-_EPOCH_START = datetime(1899, 12, 31)
 
 
 def file_by_id(svc_drive, file_id):
@@ -62,7 +61,7 @@ def load_sheet(svc_sheets, spreadsheet_id):
     return response_portfolio
 
 
-def update_sheet2(svc_sheet, spreadsheet_id, header, records):
+def update_sheet(svc_sheet, spreadsheet_id, header, records):
     if len(records) == 0:
         return
 
@@ -91,85 +90,3 @@ def update_sheet2(svc_sheet, spreadsheet_id, header, records):
             cell.value = row_data[field]
 
     worksheet.update_cells(cells)
-
-
-def update_sheet(svc_sheets, spreadsheet_id, header, rows, date_columns=None, number_columns=None):
-    """
-    Updates the first available sheet from spreadsheet_id with the specified rows and header.
-
-    :param svc_sheets: Google Sheets service
-    :param spreadsheet_id:
-    :param header:
-    :param rows:
-    :return:
-    """
-    if date_columns is None:
-        date_columns = list()
-
-    if number_columns is None:
-        number_columns = list()
-
-    spreadsheet_data = svc_sheets.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-    first_sheet_id = spreadsheet_data['sheets'][0]['properties']['sheetId']
-    first_sheet_title = spreadsheet_data['sheets'][0]['properties']['title']
-    clear_sheet_body = {
-        'updateCells': {
-            'range': {
-                'sheetId': first_sheet_id
-            },
-            'fields': '*',
-        }
-    }
-    header_row = [{'userEnteredValue': {'stringValue': header_field}} for header_field in header]
-    set_sheet_properties_body = {
-        'updateSheetProperties': {
-            'properties': {
-                'sheetId': first_sheet_id,
-                'title': first_sheet_title,
-                'index': 0,
-                'gridProperties': {
-                    'rowCount': len(rows) + 1,
-                    'columnCount': len(header_row),
-                    'frozenRowCount': 1,
-                    'hideGridlines': False,
-                },
-            },
-            'fields': '*',
-        }
-    }
-    row_data = list()
-    for row in rows[:3]:
-        user_values = list()
-        for field in header:
-            extended_value = 'stringValue'
-            field_value = row[field]
-            if field in date_columns:
-                extended_value = 'numberValue'
-                days_since_start = row[field] - _EPOCH_START
-                field_value = days_since_start.total_seconds() / 24 / 60 / 60
-
-            elif field in number_columns:
-                extended_value = 'numberValue'
-                field_value = float(row[field])
-
-            user_values.append({'userEnteredValue': {extended_value: field_value}})
-
-        row_data.append(user_values)
-
-    from pprint import pprint
-    payload = {'values': [header_row] + row_data}
-    pprint(payload)
-    logging.info('writing {} columns and {} rows'.format(len(header), len(rows) + 1))
-    cell_update_body = {
-        'updateCells': {
-            'range': {'sheetId': first_sheet_id,
-                      'startRowIndex': 0, 'endRowIndex': len(rows) + 1,
-                      'startColumnIndex': 0, 'endColumnIndex': len(header) + 30},
-            'fields': '*',
-            'rows': payload
-        }
-    }
-    batch_update_body = {
-        'requests': [clear_sheet_body, set_sheet_properties_body, cell_update_body]
-    }
-    svc_sheets.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body=batch_update_body).execute()
