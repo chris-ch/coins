@@ -4,24 +4,23 @@ import requests
 import json
 from datetime import datetime
 
-_DEFAULT_EXCHANGE = 'CCCAGG'
 _BASE_CRYPTO_COMPARE_URL = 'https://min-api.cryptocompare.com/data'
 
 
-def load_crypto_compare_data(target_pairs):
+def load_crypto_compare_data(target_pairs, exchange):
     """
 
     :param target_pairs: list of currency pairs
     :return: DataFrame of historical prices
     """
-    spot_prices = load_pairs_spot(target_pairs)
-    hist_prices_hourly = load_pairs_histo_hourly(target_pairs)
-    hist_prices_daily = load_pairs_histo_daily(target_pairs)
+    spot_prices = load_pairs_spot(target_pairs, exchange)
+    hist_prices_hourly = load_pairs_histo_hourly(target_pairs, exchange)
+    hist_prices_daily = load_pairs_histo_daily(target_pairs, exchange)
     all_data = pandas.concat([spot_prices, hist_prices_hourly, hist_prices_daily])
     return all_data.pivot_table(index='date', columns='currency', values='price').reset_index()
 
 
-def load_pairs_spot(pairs):
+def load_pairs_spot(pairs, exchange):
     """
 
     :param pairs:
@@ -33,10 +32,16 @@ def load_pairs_spot(pairs):
     for from_currency, to_currency in pairs:
         payload = {'fsym': from_currency,
                    'tsyms': to_currency,
-                   'e': _DEFAULT_EXCHANGE,  # exchange
+                   'e': exchange
                    }
         results = session.get('{}/price'.format(_BASE_CRYPTO_COMPARE_URL), params=payload)
-        spot_prices[(from_currency, to_currency)] = json.loads(results.text)[to_currency]
+        json_result = results.json()
+        if 'Message' in json_result:
+            json_message = json_result['Message']
+            message = 'Error occurred while loading prices from exchange {}: {} ({}/{})'
+            raise Exception(message.format(exchange, json_message, from_currency, to_currency))
+
+        spot_prices[(from_currency, to_currency)] = json_result[to_currency]
 
     now = datetime.now()
     timestamps = list()
@@ -51,7 +56,7 @@ def load_pairs_spot(pairs):
     return spot_df
 
 
-def load_pairs_histo_hourly(pairs):
+def load_pairs_histo_hourly(pairs, exchange):
     """
 
     :param pairs:
@@ -63,7 +68,7 @@ def load_pairs_histo_hourly(pairs):
     for from_currency, to_currency in pairs:
         payload = {'fsym': from_currency,
                    'tsym': to_currency,
-                   'e': _DEFAULT_EXCHANGE,  # exchange
+                   'e': exchange,
                    'limit': 1000
                    }
         results = session.get('{}/histohour'.format(_BASE_CRYPTO_COMPARE_URL), params=payload)
@@ -88,7 +93,7 @@ def load_pairs_histo_hourly(pairs):
     return hourly_df
 
 
-def load_pairs_histo_daily(pairs):
+def load_pairs_histo_daily(pairs, exchange):
     """
 
     :param pairs:
@@ -100,7 +105,7 @@ def load_pairs_histo_daily(pairs):
     for from_currency, to_currency in pairs:
         payload = {'fsym': from_currency,
                    'tsym': to_currency,
-                   'e': _DEFAULT_EXCHANGE,  # exchange
+                   'e': exchange,
                    'limit': 400
                    }
         results = session.get('{}/histoday'.format(_BASE_CRYPTO_COMPARE_URL), params=payload)

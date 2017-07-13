@@ -40,39 +40,30 @@ def setup_services(credentials_file):
     return svc_drive, svc_sheets
 
 
-def sheet_has_tab(svc_sheets, spreadsheet_id, tab_name):
-    request_sheet = svc_sheets.spreadsheets().get(spreadsheetId=spreadsheet_id)
-    sheet_properties = request_sheet.execute()
-
-    for sheet_data in sheet_properties['sheets']:
-        if sheet_data['properties']['title'] == tab_name:
-            return True
-
-    return False
-
-
-def load_sheet(svc_sheets, spreadsheet_id):
-    if not sheet_has_tab(svc_sheets, spreadsheet_id, _SHEET_TAB_PRICES):
-        raise Exception('Google sheet {} does not have a tab "{}"'.format(spreadsheet_id, _SHEET_TAB_PRICES))
-
-    request_portfolio = svc_sheets.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range=_SHEET_TAB_PRICES)
-    response_portfolio = request_portfolio.execute()
-    return response_portfolio
-
-
-def update_sheet(svc_sheet, spreadsheet_id, header, records):
+def save_sheet(svc_sheet, spreadsheet_id, header, records):
+    """
+    Saves indicated records to sheet.
+    :param svc_sheet:
+    :param spreadsheet_id:
+    :param header:
+    :param records:
+    :return:
+    """
     if len(records) == 0:
         return
 
+    count_columns = len(header)
+    count_rows = len(records) + 1
     workbook = svc_sheet.open_by_key(spreadsheet_id)
     sheets = dict()
     for sheet in workbook.worksheets():
         sheets[sheet.title] = sheet
 
+    if _SHEET_TAB_PRICES not in sheets:
+        workbook.add_worksheet(_SHEET_TAB_PRICES, count_rows, count_columns)
+
     worksheet = sheets[_SHEET_TAB_PRICES]
 
-    count_columns = len(header)
-    count_rows = len(records) + 1
     worksheet.resize(rows=count_rows, cols=count_columns)
     range_text = 'A1:{}'.format(rowcol_to_a1(count_rows, count_columns))
     logging.info('accessing range {}'.format(range_text))
