@@ -4,15 +4,23 @@ import logging
 import os
 from os import path
 import pandas
+import gspread
 
 from cryptocompare import load_crypto_compare_data
-from gservices import setup_services, file_by_id, update_sheet, load_sheet
+from gservices import setup_services, file_by_id, update_sheet, load_sheet, authorize_services, update_sheet2
 
 _DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE = os.sep.join(('.', 'google-service-account-creds.json'))
 _DEFAULT_CONFIG_FILE = os.sep.join(('.', 'config.json'))
 
 
-def process_spreadsheet(credentials, spreadsheet_id, prices):
+def process_spreadsheet(credentials_file, spreadsheet_id, prices):
+    authorized_http, credentials = authorize_services(credentials_file)
+    svc_sheet = gspread.authorize(credentials)
+    header = [field for field in prices.reset_index().columns.tolist() if field != 'index']
+    records = prices.to_dict(orient='records')
+    numbers_flag = [field for field in header if field != 'date']
+    update_sheet2(svc_sheet, spreadsheet_id, header, records)
+    return
     svc_drive, svc_sheets = setup_services(credentials)
     spreadsheet_name = file_by_id(svc_drive, spreadsheet_id)
     logging.info('prepared Google sheet %s: %s', spreadsheet_name, spreadsheet_id)
