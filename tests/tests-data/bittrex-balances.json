@@ -1,0 +1,23 @@
+[
+  {
+    "Currency": "NEOS",
+    "Balance": 0.09736144,
+    "Available": 0.09736144,
+    "Pending": 0.0,
+    "CryptoAddress": "NRyGpD92ph4jmbSVWwvKDmveffcRdYrJRw"
+  },
+  {
+    "Currency": "START",
+    "Balance": 0.88037596,
+    "Available": 0.88037596,
+    "Pending": 0.0,
+    "CryptoAddress": "sPUEPUh9kWfm6qVH43obwrjKDNBD56ednx"
+  },
+  {
+    "Currency": "STRAT",
+    "Balance": 0.51869045,
+    "Available": 0.51869045,
+    "Pending": 0.0,
+    "CryptoAddress": "SbJLcdm6nUz5mqdxUSXzT6SPhcUY8EHuiT"
+  }
+]
