@@ -24,13 +24,14 @@ def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history, s
     if not skip_google_update:
         authorized_http, credentials = authorize_services(credentials_file)
         svc_sheet = gspread.authorize(credentials)
-        header = [field for field in prices.reset_index().columns.tolist() if field != 'index']
+        header_prices = [field for field in prices.reset_index().columns.tolist() if field != 'index']
         logging.info('uploading {} rows for prices data'.format(prices.count().max()))
         price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
-        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header, price_records)
+        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
         logging.info('uploading {} rows for pnl data'.format(pnl_history.count().max()))
-        pnl_history_records = pnl_history.reset_index().sort_values('date', ascending=False).to_dict(orient='records')
-        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PNL, header, pnl_history_records)
+        pnl_history_records = pnl_history.sort_values('date', ascending=False).to_dict(orient='records')
+        header_pnl = [field for field in pnl_history.columns.tolist() if field != 'index']
+        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PNL, header_pnl, pnl_history_records)
 
 
 def main():

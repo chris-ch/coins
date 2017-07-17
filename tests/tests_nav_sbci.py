@@ -36,7 +36,7 @@ class TestNavSBCI(unittest.TestCase):
 
     def test_pnl_history(self):
         pnl_history = compute_pnl_history('USD', self._example_prices, self._example_withdrawals, self._example_deposits, self._example_order_hist)
-        self.assertAlmostEqual(pnl_history.sum()['NEOS'], -0.175250592, places=6)
+        self.assertAlmostEqual(pnl_history.sum()['NEOS'], -7.566931, places=6)
 
     def tearDown(self):
         self._example_order_hist_file.close()
