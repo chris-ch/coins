@@ -182,4 +182,7 @@ def parse_orders(order_history):
         parsed.append(item_short)
 
     result = pandas.DataFrame(parsed)
+    if result.empty:
+        return result
+
     return result.dropna(subset=('unit_price',))
