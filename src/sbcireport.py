@@ -31,7 +31,7 @@ def _include_indices(target_df, source_df):
 
 def compute_balances_pnl(reporting_currency, prices, withdrawals, deposits):
     """
-    Output format:
+    Output format (data expressed in terms of reporting currency):
 
               asset                       date  pnl
         10947   XRP 2017-07-17 09:00:00.000000  0.0
@@ -58,7 +58,7 @@ def compute_balances_pnl(reporting_currency, prices, withdrawals, deposits):
 
 def compute_trades_pnl(reporting_currency, prices, order_history):
     """
-    Output format:
+    Output format (data expressed in terms of reporting currency):
 
               asset                           date  realized_pnl      total_pnl       unrealized_pnl
       413       XRP     2017-07-17 09:00:00.000000           0.0   2.191488e+02         2.191488e+02
@@ -111,7 +111,7 @@ def compute_trades_pnl(reporting_currency, prices, order_history):
 
 def compute_pnl_history(reporting_currency, prices, withdrawals, deposits, order_history):
     """
-    Output format:
+    Output format (data expressed in terms of reporting currency):
 
       asset                                BTC  ETH  EUR  LTC      NEOS     START      STRAT         XRP
       date
