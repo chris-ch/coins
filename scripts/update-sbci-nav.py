@@ -5,7 +5,6 @@ import os
 from os import path
 import pandas
 import gspread
-from datetime import datetime
 
 from cryptocompare import load_crypto_compare_data
 from gservices import save_sheet, authorize_services
@@ -16,31 +15,13 @@ _DEFAULT_EXCHANGE = 'CCCAGG'
 _SHEET_TAB_PRICES = 'Prices'
 
 
-def load_fake_positions():
-    now = datetime.now()
-    daily_200_days = pandas.date_range(end=now, periods=200, freq='D').tolist()
-    hourly_5_days = pandas.date_range(end=now, periods=24 * 5, freq='H').tolist()
-    position_dates = set([now] + list(hourly_5_days) + list(daily_200_days))
-    portfolio = list()
-    for as_of_date in sorted(list(position_dates), reverse=True):
-        positions_by_date = [
-            {'date': as_of_date, 'asset': 'Tezos', 'asset_code': 'XTZ', 'weight': 0.2},
-            {'date': as_of_date, 'asset': 'EOS', 'asset_code': 'EOS', 'weight': 0.2},
-            {'date': as_of_date, 'asset': 'LiteCoin ', 'asset_code': 'LTC', 'weight': 0.2},
-            {'date': as_of_date, 'asset': 'Monero', 'asset_code': 'XMR', 'weight': 0.2},
-            {'date': as_of_date, 'asset': 'Aeternity', 'asset_code': 'AE', 'weight': 0.2},
-        ]
-        portfolio += positions_by_date
-
-    return pandas.DataFrame(portfolio).pivot_table(index='date', columns='asset_code', values='weight').reset_index()
-
-
-def process_spreadsheet(credentials_file, spreadsheet_id, prices, portfolio):
+def process_spreadsheet(credentials_file, spreadsheet_id, prices, portfolio, skip_google_update=False):
     authorized_http, credentials = authorize_services(credentials_file)
     svc_sheet = gspread.authorize(credentials)
     header = [field for field in prices.reset_index().columns.tolist() if field != 'index']
-    price_records = prices.to_dict(orient='records')
-    save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header, price_records)
+    price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
+    if not skip_google_update:
+        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header, price_records)
 
 
 def main():
@@ -89,6 +70,11 @@ def main():
                         help=help_msg_prices_exchange,
                         default=_DEFAULT_EXCHANGE
                         )
+    help_msg_skip_google_update = 'skip updating Google Sheet'
+    parser.add_argument('--skip-google-update',
+                        action='store_true',
+                        help=help_msg_skip_google_update
+                        )
 
     args = parser.parse_args()
     full_creds_path = os.path.abspath(args.google_creds)
@@ -101,7 +87,8 @@ def main():
     if not os.path.isfile(full_config_path):
         raise RuntimeError('unable to load config file: {}'.format(full_config_path))
 
-    portfolio = load_fake_positions()
+    portfolio = None  # TODO
+
     if args.prices:
         prices = pandas.read_pickle(args.prices)
 
@@ -113,7 +100,7 @@ def main():
             prices.to_pickle(args.record_prices)
 
     config_json = json.load(open(args.config, 'rt'))
-    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, portfolio)
+    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, portfolio, args.skip_google_update)
 
 
 if __name__ == '__main__':

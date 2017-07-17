@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pandas
 
-from sbcireport import compute_trades_pnl, compute_balances_pnl
+from sbcireport import compute_trades_pnl, compute_balances_pnl, compute_pnl_history
 
 
 class TestNavSBCI(unittest.TestCase):
@@ -33,6 +33,10 @@ class TestNavSBCI(unittest.TestCase):
     def test_balances_pnl(self):
         balances_pnl = compute_balances_pnl('USD', self._example_prices, self._example_withdrawals, self._example_deposits)
         self.assertAlmostEqual(balances_pnl.groupby('asset').sum().loc['START'].sum(), -0.018162, places=6)
+
+    def test_pnl_history(self):
+        pnl_history = compute_pnl_history('USD', self._example_prices, self._example_withdrawals, self._example_deposits, self._example_order_hist)
+        self.assertAlmostEqual(pnl_history.sum()['NEOS'], -0.175250592, places=6)
 
     def tearDown(self):
         self._example_order_hist_file.close()

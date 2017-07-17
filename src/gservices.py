@@ -47,7 +47,7 @@ def save_sheet(svc_sheet, spreadsheet_id, tab_name, header, records):
     :param spreadsheet_id:
     :param tab_name:
     :param header:
-    :param records:
+    :param records: list of dict to be saved (records-like format)
     :return:
     """
     if len(records) == 0:
