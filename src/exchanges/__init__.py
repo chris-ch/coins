@@ -1,0 +1,2 @@
+# Kraken API key yWGuAPYqS797e0O5trUCk96Oo70Y2jnNa4N0xfb/REdkMgxFyVkbjFgp
+# Kraken secret zI4fqsbL7fKyC72OO4iGVgG1kipkk6fBW2jypdnYJBbzeDkMO+a+6qFHBrRfBDs2Z4FDcBOxwPjRBGkG7g67hA==

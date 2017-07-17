@@ -33,6 +33,10 @@ def main():
     bittrex.connect(api_key, secret_key)
     results = bittrex.get_balances()
     print(results)
+    movements = bittrex.get_flows_history()
+    print(movements)
+    trades = bittrex.get_order_history()
+    print(trades)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')
