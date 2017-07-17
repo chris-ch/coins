@@ -33,8 +33,10 @@ def main():
     bittrex.connect(api_key, secret_key)
     results = bittrex.get_balances()
     print(results)
-    movements = bittrex.get_flows_history()
-    print(movements)
+    deposits = bittrex.get_deposit_history()
+    print(deposits)
+    withdrawals = bittrex.get_withdrawal_history()
+    print(withdrawals)
     trades = bittrex.get_order_history()
     print(trades)
 

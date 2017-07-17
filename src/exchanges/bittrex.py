@@ -79,16 +79,32 @@ def get_order_history():
 
     :return:
     """
-    return parse_orders(api_call(_REQUEST_ORDER_HISTORY))
+    return api_call(_REQUEST_ORDER_HISTORY)
 
 
-def get_flows_history():
+def get_deposit_history():
+    """
+
+    :return:
+    """
+    return api_call(_REQUEST_DEPOSIT_HISTORY)
+
+
+def get_withdrawal_history():
+    """
+
+    :return:
+    """
+    return api_call(_REQUEST_WITHDRAWAL_HISTORY)
+
+
+def parse_flows(withdrawals, deposits):
     """
 
     :return:
     """
     movements = list()
-    for withdrawal in api_call(_REQUEST_WITHDRAWAL_HISTORY):
+    for withdrawal in withdrawals:
         item = {
             'date': datetime.strptime(withdrawal['LastUpdated'], '%Y-%m-%dT%H:%M:%S.%f'),
             'amount': withdrawal['Amount'] * -1,
@@ -97,7 +113,7 @@ def get_flows_history():
         }
         movements.append(item)
 
-    for deposit in api_call(_REQUEST_DEPOSIT_HISTORY):
+    for deposit in deposits:
         item = {
             'date': datetime.strptime(deposit['LastUpdated'], '%Y-%m-%dT%H:%M:%S.%f'),
             'amount': deposit['Amount'],
