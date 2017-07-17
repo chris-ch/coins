@@ -1,3 +1,4 @@
+import itertools
 import pandas
 import logging
 import requests
@@ -7,15 +8,18 @@ from datetime import datetime
 _BASE_CRYPTO_COMPARE_URL = 'https://min-api.cryptocompare.com/data'
 
 
-def load_crypto_compare_data(target_pairs, exchange):
+def load_crypto_compare_data(currencies, reference_currencies, exchange):
     """
 
-    :param target_pairs: list of currency pairs
+    :param currencies: list of currency pairs to retrieve
+    :param reference_currencies: for quoting each currency in terms of reference currencies
     :return: DataFrame of historical prices
     """
-    spot_prices = load_pairs_spot(target_pairs, exchange)
-    hist_prices_hourly = load_pairs_histo_hourly(target_pairs, exchange)
-    hist_prices_daily = load_pairs_histo_daily(target_pairs, exchange)
+    cross_product = itertools.product(set(reference_currencies).union(set(currencies)), reference_currencies)
+    pairs = [pair for pair in cross_product if pair[0] != pair[1]]
+    spot_prices = load_pairs_spot(pairs, exchange)
+    hist_prices_hourly = load_pairs_histo_hourly(pairs, exchange)
+    hist_prices_daily = load_pairs_histo_daily(pairs, exchange)
     all_data = pandas.concat([spot_prices, hist_prices_hourly, hist_prices_daily])
     return all_data.pivot_table(index='date', columns='currency', values='price').reset_index()
 

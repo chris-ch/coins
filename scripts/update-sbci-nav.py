@@ -2,7 +2,6 @@ import argparse
 import json
 import logging
 import os
-from itertools import product
 from os import path
 import pandas
 import gspread
@@ -14,6 +13,7 @@ from gservices import save_sheet, authorize_services
 _DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE = os.sep.join(('.', 'google-service-account-creds.json'))
 _DEFAULT_CONFIG_FILE = os.sep.join(('.', 'config.json'))
 _DEFAULT_EXCHANGE = 'CCCAGG'
+_SHEET_TAB_PRICES = 'Prices'
 
 
 def load_fake_positions():
@@ -40,7 +40,7 @@ def process_spreadsheet(credentials_file, spreadsheet_id, prices, portfolio):
     svc_sheet = gspread.authorize(credentials)
     header = [field for field in prices.reset_index().columns.tolist() if field != 'index']
     price_records = prices.to_dict(orient='records')
-    save_sheet(svc_sheet, spreadsheet_id, header, price_records)
+    save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header, price_records)
 
 
 def main():
@@ -106,11 +106,9 @@ def main():
         prices = pandas.read_pickle(args.prices)
 
     else:
-        command_line_target_pairs = set([(pair.split('/')[0], pair.split('/')[1]) for pair in args.pairs.split(',')])
         portfolio_target_currencies = set(portfolio.columns.tolist())
         portfolio_target_currencies.discard('date')
-        portfolio_target_pairs = set(product(portfolio_target_currencies, args.reference_currencies.split(',')))
-        prices = load_crypto_compare_data(command_line_target_pairs.union(portfolio_target_pairs), args.exchange)
+        prices = load_crypto_compare_data(portfolio_target_currencies, args.reference_currencies.split(','), args.exchange)
         if args.record_prices:
             prices.to_pickle(args.record_prices)
 
@@ -121,8 +119,6 @@ def main():
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')
     logging.getLogger('requests').setLevel(logging.WARNING)
-    # logging.getLogger('googleapiclient.discovery').setLevel(logging.WARNING)
-    # logging.getLogger('googleapicliet.discovery_cache').setLevel(logging.ERROR)
     file_handler = logging.FileHandler('{}.log'.format(path.basename(__file__).split('.')[0]), mode='w')
     formatter = logging.Formatter('%(asctime)s:%(name)s:%(levelname)s:%(message)s')
     file_handler.setFormatter(formatter)

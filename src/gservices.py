@@ -6,7 +6,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 _GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
 _GOOGLE_DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
-_SHEET_TAB_PRICES = 'Prices'
 
 
 def file_by_id(svc_drive, file_id):
@@ -40,7 +39,7 @@ def setup_services(credentials_file):
     return svc_drive, svc_sheets
 
 
-def save_sheet(svc_sheet, spreadsheet_id, header, records):
+def save_sheet(svc_sheet, spreadsheet_id, tab_name, header, records):
     """
     Saves indicated records to sheet.
     :param svc_sheet:
@@ -59,10 +58,10 @@ def save_sheet(svc_sheet, spreadsheet_id, header, records):
     for sheet in workbook.worksheets():
         sheets[sheet.title] = sheet
 
-    if _SHEET_TAB_PRICES not in sheets:
-        workbook.add_worksheet(_SHEET_TAB_PRICES, count_rows, count_columns)
+    if tab_name not in sheets:
+        workbook.add_worksheet(tab_name, count_rows, count_columns)
 
-    worksheet = sheets[_SHEET_TAB_PRICES]
+    worksheet = sheets[tab_name]
 
     worksheet.resize(rows=count_rows, cols=count_columns)
     range_text = 'A1:{}'.format(rowcol_to_a1(count_rows, count_columns))

@@ -1,4 +1,3 @@
-import json
 import logging
 from os import path
 import argparse
@@ -30,17 +29,14 @@ def main():
         raise RuntimeError('unable to load config file: {}'.format(full_config_path))
 
     reference_currencies = ['USD', 'EUR', 'BTC', 'ETH']
-    cross_product = itertools.product(reference_currencies + ['LTC', 'XRP', 'START', 'NEOS', 'STRAT'], reference_currencies)
-    pairs = [pair for pair in cross_product if pair[0] != pair[1]]
-    result = load_crypto_compare_data(pairs, exchange='CCCAGG')
+    currencies = ['LTC', 'XRP', 'START', 'NEOS', 'STRAT']
+    result = load_crypto_compare_data(currencies, reference_currencies, exchange='CCCAGG')
     result.to_pickle('cryptocompare-prices.pkl')
     print(result)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')
     logging.getLogger('requests').setLevel(logging.WARNING)
-    # logging.getLogger('googleapiclient.discovery').setLevel(logging.WARNING)
-    # logging.getLogger('googleapicliet.discovery_cache').setLevel(logging.ERROR)
     file_handler = logging.FileHandler('{}.log'.format(path.basename(__file__).split('.')[0]), mode='w')
     formatter = logging.Formatter('%(asctime)s:%(name)s:%(levelname)s:%(message)s')
     file_handler.setFormatter(formatter)
