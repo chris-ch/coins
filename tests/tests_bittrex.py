@@ -6,7 +6,6 @@ import json
 from decimal import Decimal
 
 from exchanges.bittrex import parse_orders, parse_flows
-from pnl import AverageCostProfitAndLoss
 
 
 class TestBittrexPublicAPI(unittest.TestCase):
@@ -28,12 +27,11 @@ class TestBittrexPublicAPI(unittest.TestCase):
         logging.info('loading example withdrawals file: {}'.format(self._example_withdrawals))
         logging.info('loading example deposits file: {}'.format(self._example_deposits))
 
-    def test_calc_pnl(self):
+    def test_parsing(self):
         trades = parse_orders(self._example_order_hist)
-        print(trades)
         flows = parse_flows(self._example_withdrawals, self._example_deposits)
-        print(flows)
-        pnl_tracker = AverageCostProfitAndLoss()
+        self.assertAlmostEqual(float(trades[trades['asset'] == 'BTC']['amount'].sum()), 0.01968424)
+        self.assertAlmostEqual(float(flows[flows['asset'] == 'NEOS']['amount'].sum()), 0.09736144)
 
     def tearDown(self):
         self._example_balances_file.close()
