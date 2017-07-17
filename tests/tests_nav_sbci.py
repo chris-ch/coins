@@ -6,8 +6,7 @@ from decimal import Decimal
 
 import pandas
 
-from exchanges.bittrex import parse_flows
-from sbcireport import compute_trades_pnl
+from sbcireport import compute_trades_pnl, compute_balances_pnl
 
 
 class TestNavSBCI(unittest.TestCase):
@@ -27,15 +26,13 @@ class TestNavSBCI(unittest.TestCase):
         self._example_order_hist = json.load(self._example_order_hist_file, parse_float=Decimal)
 
     def test_trades_pnl(self):
-        pnl = compute_trades_pnl('USD', self._example_prices, self._example_order_hist)
-        self.assertAlmostEqual(pnl[pnl['asset'] == 'XRP'].tail(1)['total_pnl'].sum(), 216.213848, places=6)
+        trades_pnl = compute_trades_pnl('USD', self._example_prices, self._example_order_hist)
+        pnl_xrp = trades_pnl[trades_pnl['asset'] == 'XRP'].tail(1)['total_pnl'].sum()
+        self.assertAlmostEqual(pnl_xrp, 216.213848, places=6)
 
     def test_balances_pnl(self):
-        flows = parse_flows(self._example_withdrawals, self._example_deposits).set_index('date')
-        flows_positions = flows.pivot(columns='asset', values='amount').ffill()
-        # print(prices.index.append(flows_positions.index))
-        pnl = compute_trades_pnl('USD', self._example_prices, self._example_order_hist)
-        self.assertAlmostEqual(pnl[pnl['asset'] == 'XRP'].tail(1)['total_pnl'].sum(), 216.213848, places=6)
+        balances_pnl = compute_balances_pnl('USD', self._example_prices, self._example_withdrawals, self._example_deposits)
+        self.assertAlmostEqual(balances_pnl.groupby('asset').sum().loc['START'].sum(), -0.018162, places=6)
 
     def tearDown(self):
         self._example_order_hist_file.close()
