@@ -61,9 +61,10 @@ def save_sheet(svc_sheet, spreadsheet_id, tab_name, header, records):
         sheets[sheet.title] = sheet
 
     if tab_name not in sheets:
-        workbook.add_worksheet(tab_name, count_rows, count_columns)
+        worksheet = workbook.add_worksheet(tab_name, count_rows, count_columns)
 
-    worksheet = sheets[tab_name]
+    else:
+        worksheet = sheets[tab_name]
 
     worksheet.resize(rows=count_rows, cols=count_columns)
     range_text = 'A1:{}'.format(rowcol_to_a1(count_rows, count_columns))

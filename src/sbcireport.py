@@ -53,7 +53,9 @@ def compute_balances_pnl(reporting_currency, prices, withdrawals, deposits):
     prices_selection = _include_indices(prices_selection, balances).ffill()
     balances = _include_indices(balances, prices_selection).ffill()
     performances = prices_selection.diff() * balances.shift()
-    return performances.unstack().reset_index().fillna(0).rename(columns={'level_0': 'asset', 0: 'pnl'})
+    cum_perf = performances.cumsum()
+    formatted = cum_perf.unstack().reset_index().fillna(0).rename(columns={'level_0': 'asset', 0: 'pnl'})
+    return formatted
 
 
 def compute_trades_pnl(reporting_currency, prices, order_history):
