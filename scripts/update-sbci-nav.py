@@ -134,7 +134,8 @@ def main():
     pnl_history = compute_pnl_history(reporting_currency, prices, withdrawals, deposits, order_history)
 
     config_json = json.load(open(args.config, 'rt'))
-    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, pnl_history, args.skip_google_update)
+    pnl_history['Portfolio P&L'] = pnl_history.set_index('date').apply(sum, axis=1)
+    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, pnl_history.reset_index(), args.skip_google_update)
 
 
 if __name__ == '__main__':
