@@ -6,6 +6,7 @@ import json
 from decimal import Decimal
 
 from exchanges.bittrex import parse_orders, parse_flows
+from pnl import AverageCostProfitAndLoss
 
 
 class TestBittrexPublicAPI(unittest.TestCase):
@@ -32,6 +33,7 @@ class TestBittrexPublicAPI(unittest.TestCase):
         print(trades)
         flows = parse_flows(self._example_withdrawals, self._example_deposits)
         print(flows)
+        pnl_tracker = AverageCostProfitAndLoss()
 
     def tearDown(self):
         self._example_balances_file.close()

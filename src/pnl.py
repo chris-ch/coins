@@ -52,7 +52,6 @@ class AverageCostProfitAndLoss(object):
         if self._quantity == 0:
             self._quantity = fill_qty
             self._cost = fill_qty * fill_price
-            self._realized_pnl = 0
 
         else:
             closing_qty = 0

@@ -157,10 +157,10 @@ class TestProfitAndLoss(unittest.TestCase):
         self.assertAlmostEqual(pos.realized_pnl, 1.989400)
         self.assertAlmostEqual(pos.get_unrealized_pnl(38.7654), 0.)
         pos.add_fill(-203, 38.7950)
-        self.assertAlmostEqual(pos.realized_pnl, 0.)
+        self.assertAlmostEqual(pos.realized_pnl, 1.989400)
         self.assertAlmostEqual(pos.get_unrealized_pnl(38.7950), 0.)
         pos.add_fill(203, 38.8443)
-        self.assertAlmostEqual(pos.realized_pnl, 203. * (38.7950 - 38.8443))
+        self.assertAlmostEqual(pos.realized_pnl, 1.989400 + 203. * (38.7950 - 38.8443))
         self.assertAlmostEqual(pos.get_unrealized_pnl(38.8443), 0.)
 
 if __name__ == '__main__':
