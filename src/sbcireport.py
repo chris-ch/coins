@@ -110,6 +110,24 @@ def compute_trades_pnl(reporting_currency, prices, order_history):
 
 
 def compute_pnl_history(reporting_currency, prices, withdrawals, deposits, order_history):
+    """
+    Output format:
+
+      asset                                BTC  ETH  EUR  LTC      NEOS     START      STRAT         XRP
+      date
+      2017-07-17 08:00:00.000000 -2.703352e+06  0.0  0.0  0.0  0.005842  0.000238   0.041495  212.745259
+      2017-07-17 09:00:00.000000 -2.766600e+06  0.0  0.0  0.0  0.006815  0.000801   0.067430  219.148809
+      2017-07-17 10:00:00.000000 -2.744735e+06  0.0  0.0  0.0  0.000974 -0.000836  -0.015561  216.213848
+      2017-07-17 10:04:06.200048 -2.744481e+06  0.0  0.0  0.0  0.000000  0.000000   0.000000  216.213848
+      2017-07-17 10:35:09.143000           NaN  NaN  NaN  NaN       NaN       NaN        NaN         NaN
+
+    :param reporting_currency:
+    :param prices:
+    :param withdrawals:
+    :param deposits:
+    :param order_history:
+    :return:
+    """
     balances_pnl = compute_balances_pnl(reporting_currency, prices, withdrawals, deposits)
     trades_pnl = compute_trades_pnl(reporting_currency, prices, order_history)
     balances_pnl_by_asset = balances_pnl.groupby(['date', 'asset']).sum().unstack()['pnl']
