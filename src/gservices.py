@@ -42,8 +42,10 @@ def setup_services(credentials_file):
 def save_sheet(svc_sheet, spreadsheet_id, tab_name, header, records):
     """
     Saves indicated records to sheet.
+
     :param svc_sheet:
     :param spreadsheet_id:
+    :param tab_name:
     :param header:
     :param records:
     :return:
