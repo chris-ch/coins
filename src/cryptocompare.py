@@ -26,7 +26,7 @@ def load_pairs_spot(pairs, exchange):
     :param pairs:
     :return:
     """
-    logging.info('loading pairs: {}'.format(str(pairs)))
+    logging.info('loading spot data for pairs: {}'.format(str(pairs)))
     session = requests.Session()
     spot_prices = dict()
     for from_currency, to_currency in pairs:
@@ -62,7 +62,7 @@ def load_pairs_histo_hourly(pairs, exchange):
     :param pairs:
     :return:
     """
-    logging.info('loading pairs: {}'.format(str(pairs)))
+    logging.info('loading hourly data for pairs: {}'.format(str(pairs)))
     session = requests.Session()
     output = dict()
     for from_currency, to_currency in pairs:
@@ -99,7 +99,7 @@ def load_pairs_histo_daily(pairs, exchange):
     :param pairs:
     :return:
     """
-    logging.info('loading pairs: {}'.format(str(pairs)))
+    logging.info('loading daily data for pairs: {}'.format(str(pairs)))
     session = requests.Session()
     output = dict()
     for from_currency, to_currency in pairs:

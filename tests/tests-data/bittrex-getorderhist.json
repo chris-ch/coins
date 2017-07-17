@@ -17,7 +17,7 @@
   },
   {
     "OrderUuid": "17fd64d1-f4bd-4fb6-adb9-42ec68b8697d",
-    "Exchange": "BTC-ZS",
+    "Exchange": "BTC-XRP",
     "TimeStamp": "2017-07-08T20:38:58.317",
     "OrderType": "LIMIT_SELL",
     "Limit": 0.00002950,
