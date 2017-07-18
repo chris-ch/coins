@@ -40,9 +40,6 @@ def main():
     logging.info('orders:\n{}'.format(orders))
     logging.info('deposits:\n{}'.format(deposits))
     logging.info('withdrawals:\n{}'.format(withdrawals))
-    orders.to_pickle('output/kraken_orders.pkl')
-    deposits.to_pickle('output/kraken_deposits.pkl')
-    withdrawals.to_pickle('output/kraken_withdrawals.pkl')
 
 
 if __name__ == '__main__':

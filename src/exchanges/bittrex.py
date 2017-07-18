@@ -22,27 +22,12 @@ _api_key = None
 _secret_key = None
 
 
-def connect(api_key, secret_key):
-    """
-
-    :param api_key:
-    :param secret_key:
-    :return:
-    """
-    global _requests_session
-    global _api_key
-    global _secret_key
-    _api_key = api_key
-    _secret_key = secret_key
-    _requests_session = requests.session()
-
-
 def retrieve_data(api_key, secret_key):
     """
 
     :param api_key:
     :param secret_key:
-    :return: (deposits, withdrawals, order_history, currencies)
+    :return: (flows, trades, currencies)
     """
     connect(api_key, secret_key)
     deposits = get_deposit_history()
@@ -60,8 +45,25 @@ def retrieve_data(api_key, secret_key):
         flows_currencies = set(flows_parsed['asset'].tolist())
 
     currencies = flows_currencies.union(orders_currencies)
+    flows = parse_flows(withdrawals, deposits).set_index('date')
+    trades = parse_orders(order_history)
 
-    return deposits, withdrawals, order_history, currencies
+    return flows, trades, currencies
+
+
+def connect(api_key, secret_key):
+    """
+
+    :param api_key:
+    :param secret_key:
+    :return:
+    """
+    global _requests_session
+    global _api_key
+    global _secret_key
+    _api_key = api_key
+    _secret_key = secret_key
+    _requests_session = requests.session()
 
 
 def _api_call(method, options=None):

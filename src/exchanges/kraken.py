@@ -20,6 +20,20 @@ _secret_key = None
 _requests_session = None
 
 
+def retrieve_data(api_key, secret_key):
+    """
+
+    :param api_key:
+    :param secret_key:
+    :return: (flows, trades, currencies)
+    """
+    connect(api_key, secret_key)
+    flows = None
+    trades = None
+    currencies = None
+    return flows, trades, currencies
+
+
 def connect(api_key, secret_key):
     """
 

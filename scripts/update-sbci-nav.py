@@ -5,12 +5,11 @@ import os
 from os import path
 from datetime import datetime
 
-from exchanges import bittrex
 import pandas
 import gspread
 
 from cryptocompare import load_crypto_compare_data
-from exchanges.bittrex import parse_flows, parse_orders
+from exchanges import bittrex
 from gservices import save_sheet, authorize_services
 from sbcireport import compute_balances, extend_balances, compute_balances_pnl, compute_pnl_history
 
@@ -116,7 +115,8 @@ def main():
     api_key = config_json['exchanges']['bittrex']['key']
     secret_key = config_json['exchanges']['bittrex']['secret']
 
-    deposits, withdrawals, order_history, currencies = bittrex.retrieve_data(api_key, secret_key)
+    flows, trades, currencies = bittrex.retrieve_data(api_key, secret_key)
+
     reference_pairs = [(currency.split('.')[0], currency.split('.')[1]) for currency in args.reference_pairs.split(',')]
 
     if args.prices:
@@ -128,9 +128,9 @@ def main():
         if args.record_prices:
             prices.to_pickle(args.record_prices)
 
-    reporting_currency = 'USD'
+    reporting_currency = 'USD'  # TODO: config param
+    fund_inception_date = datetime(2017, 6, 1)  # TODO: config param
 
-    flows = parse_flows(withdrawals, deposits).set_index('date')
     balances_by_asset = compute_balances(flows)
 
     extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, prices)
@@ -140,7 +140,6 @@ def main():
     balances_total.name = 'Portfolio P&L'
 
     balances_pnl = compute_balances_pnl(reporting_currency, balances_by_asset, prices)
-    trades = parse_orders(order_history)
     pnl_history = compute_pnl_history(reporting_currency, prices, balances_pnl, trades)
     pnl_history.name = 'Portfolio P&L'
 
@@ -150,7 +149,7 @@ def main():
     remaining_columns.discard('date')
     prices = prices[['date'] + reporting_pairs + list(remaining_columns)]
     process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, balances_total,
-                        skip_google_update=args.skip_google_update, pnl_start=datetime(2017, 6, 1))
+                        skip_google_update=args.skip_google_update, pnl_start=fund_inception_date)
 
 
 if __name__ == '__main__':
