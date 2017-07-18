@@ -9,7 +9,9 @@ from requests import Request
 import pandas
 from datetime import datetime
 
-_BASE_URL = 'https://bittrex.com/api/v1.1'
+_API_VERSION = 'v1.1'
+_DOMAIN = 'bittrex.com'
+_BASE_URL = 'https://{}/api/{}'.format(_DOMAIN, _API_VERSION)
 _REQUEST_ACCOUNT_BALANCES = '/account/getbalances'
 _REQUEST_ORDER_HISTORY = '/account/getorderhistory'
 _REQUEST_WITHDRAWAL_HISTORY = '/account/getwithdrawalhistory'
@@ -80,8 +82,6 @@ def api_call(method, options=None):
     params.update(options)
     request = Request('GET', _BASE_URL + method, params=params)
     prepared_request = request.prepare()
-    logging.info(_secret_key)
-    logging.info(prepared_request.url)
     signature = hmac.new(_secret_key.encode(), prepared_request.url.encode(), digestmod=hashlib.sha512)
     prepared_request.headers.update({'apisign': signature.hexdigest()})
     logging.info('headers: {}'.format(prepared_request.headers))
