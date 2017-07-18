@@ -1,7 +1,5 @@
-import urllib.request
 import urllib.parse
-import urllib.error
-
+import logging
 import time
 
 import hashlib
@@ -9,6 +7,8 @@ import hmac
 import base64
 
 import requests
+
+import pandas
 
 _DOMAIN = 'api.kraken.com'
 _API_VERSION = '0'
@@ -44,6 +44,7 @@ def _api_call(url_path, options, headers=None):
         headers = {}
 
     response = _requests_session.post(url, data=options, headers=headers)
+    logging.info('response: "{}"'.format(response.text))
     return response.json()
 
 
@@ -77,4 +78,17 @@ def api_call_private(method, options=None):
 
 
 def get_balances():
-    return api_call_private('Balance')
+    return api_call_private('Balance')['result']
+
+
+def merge_dicts(dict1, dict2):
+    dict1_copy = dict1.copy()
+    dict1_copy.update(dict2)
+    return dict1_copy
+
+
+def get_closed_orders():
+    closed_orders = api_call_private('ClosedOrders', options={'trades': False, 'closetime': 'close'})['result']['closed']
+    records = [merge_dicts(closed_order, {'order_id': key}) for key, closed_order in closed_orders.items() if
+               closed_order['status'] != 'canceled']
+    return pandas.DataFrame(records)
