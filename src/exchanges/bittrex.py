@@ -35,6 +35,33 @@ def connect(api_key, secret_key):
     _requests_session = requests.session()
 
 
+def retrieve_data(api_key, secret_key):
+    """
+
+    :param api_key:
+    :param secret_key:
+    :return: (deposits, withdrawals, order_history, currencies)
+    """
+    connect(api_key, secret_key)
+    deposits = get_deposit_history()
+    withdrawals = get_withdrawal_history()
+    order_history = get_order_history()
+
+    orders_parsed = parse_orders(order_history)
+    orders_currencies = set()
+    if not orders_parsed.empty:
+        orders_currencies = set(orders_parsed['asset'].tolist())
+
+    flows_parsed = parse_flows(withdrawals, deposits)
+    flows_currencies = set()
+    if not flows_parsed.empty:
+        flows_currencies = set(flows_parsed['asset'].tolist())
+
+    currencies = flows_currencies.union(orders_currencies)
+
+    return deposits, withdrawals, order_history, currencies
+
+
 def api_call(method, options=None):
     """
 
@@ -146,43 +173,61 @@ def parse_orders(order_history):
     :return:
     """
     parsed = list()
+    logging.debug('processing orders:\n{}'.format(order_history))
     for order in order_history:
+
+        traded_qty = (to_decimal(order['Quantity']) - to_decimal(order['QuantityRemaining']))
+
+        # Example:
+        # {
+        # 'OrderUuid': '17fd64d1-f4bd-4fb6-adb9-42ec68b8697d',
+        # 'Exchange': 'BTC-XRP',
+        # 'TimeStamp': '2017-07-08T20:38:58.317',
+        # 'OrderType': 'LIMIT_BUY',
+        # 'Limit': Decimal('0.00002950'),
+        # 'Quantity': Decimal('667.03644955'),
+        # 'QuantityRemaining': Decimal('0E-8'),
+        # 'Commission': Decimal('0.00004921'),
+        # 'Price': Decimal('0.01968424'),
+        # 'PricePerUnit': Decimal('0.00002950'),
+        # 'IsConditional': False,
+        # 'Condition': None,
+        # 'ConditionTarget': None,
+        # 'ImmediateOrCancel': False
+        # }
+        #
+        # --->  1. SELL 0.01968424 BTC
+        #       2. BUY 667.03644955 XRP
+
+        pair = order['Exchange'].split('-')
+
+        first_leg_asset = pair[0]
+        first_leg_qty = order['Price'] * -1
+
+        second_leg_asset = pair[1]
+        second_leg_qty = traded_qty
+
         sign = 1
         if 'SELL' in order['OrderType']:
             sign = -1
 
-        traded_qty = (to_decimal(order['Quantity']) - to_decimal(order['QuantityRemaining'])) * sign
-
-        unit_price = None
-        if traded_qty != 0:
-            unit_price = float(order['Price']) / abs(float(traded_qty))
-
-        pair = order['Exchange'].split('-')
-        first_leg_asset = pair[0]
-        second_leg_asset = pair[1]
-        item_long = {
+        item_first = {
             'date': datetime.strptime(order['TimeStamp'], '%Y-%m-%dT%H:%M:%S.%f'),
             'asset': first_leg_asset,
-            'qty':  traded_qty,
-            'fees': to_decimal(order['Commission']),
-            'unit_price': unit_price,
-            'amount': to_decimal(order['Price']),
+            'qty':  first_leg_qty * sign,
+            'fees': to_decimal(order['Commission']),  # all fees for first leg
             'exchange': 'bittrex'
             }
-        parsed.append(item_long)
-        item_short = {
+        item_second = {
             'date': datetime.strptime(order['TimeStamp'], '%Y-%m-%dT%H:%M:%S.%f'),
             'asset': second_leg_asset,
-            'qty':  traded_qty * -1,
-            'fees': to_decimal(order['Commission']),
-            'unit_price': unit_price,
-            'amount': to_decimal(order['Price']) * -1,
+            'qty':  second_leg_qty * sign,
+            'fees': 0.,  # all fees for first leg
             'exchange': 'bittrex'
             }
-        parsed.append(item_short)
+
+        parsed.append(item_first)
+        parsed.append(item_second)
 
     result = pandas.DataFrame(parsed)
-    if result.empty:
-        return result
-
-    return result.dropna(subset=('unit_price',))
+    return result

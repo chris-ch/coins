@@ -1,5 +1,6 @@
 import pandas
 from collections import defaultdict
+import logging
 
 from exchanges.bittrex import parse_orders, parse_flows
 from pnl import AverageCostProfitAndLoss
@@ -29,7 +30,20 @@ def _include_indices(target_df, source_df):
     return target_df.reindex(target_df.index.append(source_df.index)).sort_index()
 
 
-def compute_balances_pnl(reporting_currency, prices, withdrawals, deposits):
+def compute_balances(withdrawals, deposits):
+    """
+
+    :param withdrawals:
+    :param deposits:
+    :return:
+    """
+    flows = parse_flows(withdrawals, deposits).set_index('date')
+    flows_by_asset = flows.pivot(columns='asset', values='amount').apply(pandas.to_numeric)
+    balances = flows_by_asset.fillna(0).cumsum()
+    return balances
+
+
+def compute_balances_pnl(reporting_currency, prices, balances):
     """
     Output format (data expressed in terms of reporting currency):
 
@@ -42,13 +56,9 @@ def compute_balances_pnl(reporting_currency, prices, withdrawals, deposits):
 
     :param reporting_currency:
     :param prices:
-    :param withdrawals:
-    :param deposits:
+    :param balances:
     :return:
     """
-    flows = parse_flows(withdrawals, deposits).set_index('date')
-    flows_by_asset = flows.pivot(columns='asset', values='amount').apply(pandas.to_numeric)
-    balances = flows_by_asset.fillna(0).cumsum()
     prices_selection = _select_prices(reporting_currency, prices)
     prices_selection = _include_indices(prices_selection, balances).ffill()
     balances = _include_indices(balances, prices_selection).ffill()
@@ -75,22 +85,23 @@ def compute_trades_pnl(reporting_currency, prices, order_history):
     :return:
     """
     trades = parse_orders(order_history)
+    logging.debug('loaded orders:\n{}'.format(trades))
     if trades.empty:
-        return pandas.DataFrame()
+        return pandas.DataFrame({'asset': [], 'date': [], 'realized_pnl': [], 'total_pnl': [], 'unrealized_pnl': []})
 
     trades = trades.set_index('date')
     prices_selection = _select_prices(reporting_currency, prices)
-    prices_selection = _include_indices(prices_selection, trades)
+    prices_selection = _include_indices(prices_selection, trades).ffill()
     pnl_tracker = defaultdict(AverageCostProfitAndLoss)
     pnl_data = list()
     for timestamp, price_row in prices_selection.iterrows():
         if timestamp in trades.index:
             current_trades = trades.loc[timestamp]
             for trade_ts, trade_row in current_trades.iterrows():
-                fill_qty = float(trade_row['qty'])
-                fill_price = float(trade_row['unit_price'])
                 fees = trade_row['fees']
                 asset = trade_row['asset']
+                fill_qty = float(trade_row['qty'])
+                fill_price = price_row[asset]
                 pnl_tracker[asset].add_fill(fill_qty, fill_price, fees)
                 pnl_asset_data = {
                     'date': trade_ts,
@@ -100,6 +111,7 @@ def compute_trades_pnl(reporting_currency, prices, order_history):
                     'total_pnl': pnl_tracker[asset].get_total_pnl(fill_price),
                 }
                 pnl_data.append(pnl_asset_data)
+                logging.info('*trade* added pnl data: {}'.format(pnl_asset_data))
 
         else:
             for asset in pnl_tracker:
@@ -111,11 +123,12 @@ def compute_trades_pnl(reporting_currency, prices, order_history):
                     'total_pnl': pnl_tracker[asset].get_total_pnl(price_row[asset]),
                 }
                 pnl_data.append(pnl_asset_data)
+                logging.info('added pnl data: {}'.format(pnl_asset_data))
 
     return pandas.DataFrame(pnl_data)
 
 
-def compute_pnl_history(reporting_currency, prices, withdrawals, deposits, order_history):
+def compute_pnl_history(reporting_currency, prices, balances_pnl, order_history):
     """
     Output format (data expressed in terms of reporting currency):
 
@@ -134,7 +147,6 @@ def compute_pnl_history(reporting_currency, prices, withdrawals, deposits, order
     :param order_history:
     :return:
     """
-    balances_pnl = compute_balances_pnl(reporting_currency, prices, withdrawals, deposits)
     trades_pnl = compute_trades_pnl(reporting_currency, prices, order_history)
     balances_pnl_by_asset = balances_pnl.groupby(['date', 'asset']).sum().unstack()['pnl']
     if trades_pnl.empty:
@@ -145,4 +157,4 @@ def compute_pnl_history(reporting_currency, prices, withdrawals, deposits, order
         trades_pnl_by_asset = trades_pnl_by_asset.reindex(columns=balances_pnl_by_asset.columns).fillna(0)
         pnl_history = balances_pnl_by_asset + trades_pnl_by_asset
 
-    return pnl_history.reset_index()
+    return pnl_history.apply(sum, axis=1)

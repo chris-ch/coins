@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pandas
 
-from sbcireport import compute_trades_pnl, compute_balances_pnl, compute_pnl_history
+from sbcireport import compute_trades_pnl, compute_balances_pnl, compute_pnl_history, compute_balances
 
 
 class TestNavSBCI(unittest.TestCase):
@@ -28,15 +28,18 @@ class TestNavSBCI(unittest.TestCase):
     def test_trades_pnl(self):
         trades_pnl = compute_trades_pnl('USD', self._example_prices, self._example_order_hist)
         pnl_xrp = trades_pnl[trades_pnl['asset'] == 'XRP'].tail(1)['total_pnl'].sum()
-        self.assertAlmostEqual(pnl_xrp, 216.213848, places=6)
+        self.assertAlmostEqual(pnl_xrp, 85.514073, places=6)
 
     def test_balances_pnl(self):
-        balances_pnl = compute_balances_pnl('USD', self._example_prices, self._example_withdrawals, self._example_deposits)
-        self.assertAlmostEqual(balances_pnl.groupby('asset').sum().loc['START'].sum(), -0.018162, places=6)
+        balances = compute_balances(self._example_withdrawals, self._example_deposits)
+        balances_pnl = compute_balances_pnl('USD', self._example_prices, balances)
+        self.assertAlmostEqual(balances_pnl.groupby('asset').sum().loc['START'].sum(), -2.136932, places=6)
 
     def test_pnl_history(self):
-        pnl_history = compute_pnl_history('USD', self._example_prices, self._example_withdrawals, self._example_deposits, self._example_order_hist)
-        self.assertAlmostEqual(pnl_history.sum()['NEOS'], -7.566931, places=6)
+        balances = compute_balances(self._example_withdrawals, self._example_deposits)
+        balances_pnl = compute_balances_pnl('USD', self._example_prices, balances)
+        pnl_history = compute_pnl_history('USD', self._example_prices, balances_pnl, self._example_order_hist)
+        self.assertAlmostEqual(pnl_history.sum(), 7811.912114, places=6)
 
     def tearDown(self):
         self._example_order_hist_file.close()
@@ -44,5 +47,5 @@ class TestNavSBCI(unittest.TestCase):
         self._example_deposits_file.close()
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')
     unittest.main()

@@ -3,15 +3,15 @@ import json
 import logging
 import os
 from os import path
+from datetime import datetime
 
 from exchanges import bittrex
 import pandas
 import gspread
 
 from cryptocompare import load_crypto_compare_data
-from exchanges.bittrex import parse_flows, parse_orders
 from gservices import save_sheet, authorize_services
-from sbcireport import compute_pnl_history
+from sbcireport import compute_pnl_history, compute_balances_pnl, compute_balances
 
 _DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE = os.sep.join(('.', 'google-service-account-creds.json'))
 _DEFAULT_CONFIG_FILE = os.sep.join(('.', 'config.json'))
@@ -27,11 +27,12 @@ def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history, s
         header_prices = [field for field in prices.reset_index().columns.tolist() if field != 'index']
         logging.info('uploading {} rows for prices data'.format(prices.count().max()))
         price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
-        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
+        #save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
         logging.info('uploading {} rows for pnl data'.format(pnl_history.count().max()))
-        pnl_history_records = pnl_history.sort_values('date', ascending=False).to_dict(orient='records')
-        header_pnl = [field for field in pnl_history.columns.tolist() if field != 'index']
-        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PNL, header_pnl, pnl_history_records)
+        pnl_history_records = pandas.DataFrame(pnl_history).reset_index().sort_values('date', ascending=False)
+        pnl_history_records = pnl_history_records[pnl_history_records['date'] > datetime(2017, 6, 1)]
+        header_pnl = ['date', pnl_history.name]
+        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PNL, header_pnl, pnl_history_records.to_dict(orient='records'))
 
 
 def main():
@@ -100,27 +101,8 @@ def main():
     config_json = json.load(open(args.config, 'rt'))
     api_key = config_json['exchanges']['bittrex']['key']
     secret_key = config_json['exchanges']['bittrex']['secret']
-    bittrex.connect(api_key, secret_key)
 
-    balances = pandas.DataFrame(bittrex.get_balances())
-    balances_currencies = set()
-    if not balances.empty:
-        balances_currencies = set(balances['Currency'].tolist())
-
-    deposits = bittrex.get_deposit_history()
-    withdrawals = bittrex.get_withdrawal_history()
-    flows_parsed = parse_flows(withdrawals, deposits)
-    flows_currencies = set()
-    if not flows_parsed.empty:
-        flows_currencies = set(flows_parsed['asset'].tolist())
-
-    order_history = bittrex.get_order_history()
-    orders_parsed = parse_orders(order_history)
-    orders_currencies = set()
-    if not orders_parsed.empty:
-        orders_currencies = set(orders_parsed['asset'].tolist())
-
-    currencies = balances_currencies.union(flows_currencies).union(orders_currencies)
+    deposits, withdrawals, order_history, currencies = bittrex.retrieve_data(api_key, secret_key)
 
     if args.prices:
         prices = pandas.read_pickle(args.prices)
@@ -131,11 +113,13 @@ def main():
             prices.to_pickle(args.record_prices)
 
     reporting_currency = 'USD'
-    pnl_history = compute_pnl_history(reporting_currency, prices, withdrawals, deposits, order_history)
+    balances_by_asset = compute_balances(withdrawals, deposits)
+    balances_pnl = compute_balances_pnl(reporting_currency, prices, balances_by_asset)
+    pnl_history = compute_pnl_history(reporting_currency, prices, balances_pnl, order_history)
+    pnl_history.name = 'Portfolio P&L'
 
     config_json = json.load(open(args.config, 'rt'))
-    pnl_history['Portfolio P&L'] = pnl_history.set_index('date').apply(sum, axis=1)
-    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, pnl_history.reset_index(), args.skip_google_update)
+    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, pnl_history, args.skip_google_update)
 
 
 if __name__ == '__main__':

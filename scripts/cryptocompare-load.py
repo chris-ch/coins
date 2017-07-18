@@ -32,7 +32,7 @@ def main():
     currencies = ['LTC', 'XRP', 'START', 'NEOS', 'STRAT']
     result = load_crypto_compare_data(currencies, reference_currencies, exchange='CCCAGG')
     result.to_pickle('cryptocompare-prices.pkl')
-    print(result)
+    logging.info('result:\n{}'.format(result))
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')

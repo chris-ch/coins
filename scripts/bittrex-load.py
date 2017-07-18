@@ -31,20 +31,18 @@ def main():
     api_key = config_json['exchanges']['bittrex']['key']
     secret_key = config_json['exchanges']['bittrex']['secret']
     bittrex.connect(api_key, secret_key)
-    results = bittrex.get_balances()
-    print(results)
+    balances = bittrex.get_balances()
     deposits = bittrex.get_deposit_history()
-    print(deposits)
     withdrawals = bittrex.get_withdrawal_history()
-    print(withdrawals)
     trades = bittrex.get_order_history()
-    print(trades)
+    logging.info('balances:\n{}'.format(balances))
+    logging.info('deposits:\n{}'.format(deposits))
+    logging.info('withdrawals:\n{}'.format(withdrawals))
+    logging.info('trades:\n{}'.format(trades))
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')
     logging.getLogger('requests').setLevel(logging.WARNING)
-    # logging.getLogger('googleapiclient.discovery').setLevel(logging.WARNING)
-    # logging.getLogger('googleapicliet.discovery_cache').setLevel(logging.ERROR)
     file_handler = logging.FileHandler('{}.log'.format(path.basename(__file__).split('.')[0]), mode='w')
     formatter = logging.Formatter('%(asctime)s:%(name)s:%(levelname)s:%(message)s')
     file_handler.setFormatter(formatter)

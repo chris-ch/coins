@@ -30,7 +30,7 @@ class TestBittrexPublicAPI(unittest.TestCase):
     def test_parsing(self):
         trades = parse_orders(self._example_order_hist)
         flows = parse_flows(self._example_withdrawals, self._example_deposits)
-        self.assertAlmostEqual(float(trades[trades['asset'] == 'BTC']['amount'].sum()), 0.01968424)
+        self.assertAlmostEqual(float(trades[trades['asset'] == 'BTC']['qty'].sum()), 0.01968424)
         self.assertAlmostEqual(float(flows[flows['asset'] == 'NEOS']['amount'].sum()), 0.09736144)
 
     def tearDown(self):
