@@ -1,6 +1,7 @@
 import urllib.parse
 import logging
 import time
+from datetime import datetime
 
 import hashlib
 import hmac
@@ -44,6 +45,10 @@ def _api_call(url_path, options, headers=None):
         headers = {}
 
     response = _requests_session.post(url, data=options, headers=headers)
+    if response.status_code != requests.codes.ok:
+        logging.error('failed requesting data: status {}'.format(response.status_code))
+        response.raise_for_status()
+
     logging.info('response: "{}"'.format(response.text))
     return response.json()
 
@@ -81,14 +86,53 @@ def get_balances():
     return api_call_private('Balance')['result']
 
 
-def merge_dicts(dict1, dict2):
+def merge_dicts(dict1, *dicts):
     dict1_copy = dict1.copy()
-    dict1_copy.update(dict2)
+    for other_dict in dicts:
+        dict1_copy.update(other_dict)
+
     return dict1_copy
 
 
 def get_closed_orders():
-    closed_orders = api_call_private('ClosedOrders', options={'trades': False, 'closetime': 'close'})['result']['closed']
-    records = [merge_dicts(closed_order, {'order_id': key}) for key, closed_order in closed_orders.items() if
-               closed_order['status'] != 'canceled']
+    closed_orders = api_call_private('ClosedOrders', options={'trades': False, 'closetime': 'close'})['result'][
+        'closed']
+    records = list()
+    for order_id, closed_order in closed_orders.items():
+        if closed_order['status'] != 'canceled':
+            description = closed_order.pop('descr')
+            record = merge_dicts(closed_order, {'order_id': order_id}, description)
+            record.pop('trades')
+            record.pop('userref')
+            record.pop('status')
+            record.pop('reason')
+            record.pop('refid')
+            record.pop('expiretm')
+            record.pop('misc')
+            record.pop('oflags')
+            record.pop('order')
+            record.pop('starttm')
+            record.pop('opentm')
+            record['closetm'] = datetime.fromtimestamp(record['closetm'])
+            records.append(record)
+
     return pandas.DataFrame(records)
+
+
+def get_ledgers_info(options=None):
+    ledgers_info = api_call_private('Ledgers', options=options)['result']['ledger']
+    records = list()
+    for ledger_id, ledger in ledgers_info.items():
+        record = merge_dicts(ledger, {'ledger_id': ledger_id})
+        record['time'] = datetime.fromtimestamp(record['time'])
+        records.append(record)
+
+    return pandas.DataFrame(records)
+
+
+def get_deposits():
+    return get_ledgers_info({'type': 'deposit'})
+
+
+def get_withdrawals():
+    return get_ledgers_info({'type': 'withdrawal'})
