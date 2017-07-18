@@ -44,7 +44,6 @@ def main():
     for common_leg in assets:
         logging.info('trying currency {}'.format(common_leg))
         for leg_pair1 in assets:
-            sleep(1)
             if leg_pair1 == common_leg:
                 continue
 
@@ -55,15 +54,17 @@ def main():
                 direct_pair = leg_pair1 + leg_pair2
                 indirect_pair_1 = leg_pair1 + common_leg
                 indirect_pair_2 = leg_pair2 + common_leg
-                if direct_pair in available_pairs:
+                if available_pairs.issuperset({direct_pair, indirect_pair_1, indirect_pair_2}):
                     logging.info('trying pair {} with {} and {}'.format(direct_pair, indirect_pair_1, indirect_pair_2))
+                    sleep(1)
                     direct_bid, direct_ask = get_order_book(direct_pair)
+                    sleep(1)
                     indirect_bid_1, indirect_ask_1 = get_order_book(indirect_pair_1)
+                    sleep(1)
                     indirect_bid_2, indirect_ask_2 = get_order_book(indirect_pair_2)
-                    print('------------')
-                    print('{}: {} / {}'.format(direct_pair, direct_bid, direct_ask))
-                    print('{}: {} / {}'.format(indirect_pair_1, indirect_bid_1, indirect_ask_1))
-                    print('{}: {} / {}'.format(indirect_pair_2, indirect_bid_2, indirect_ask_2))
+                    logging.info('{}: {} / {}'.format(direct_pair, direct_bid, direct_ask))
+                    logging.info('{}: {} / {}'.format(indirect_pair_1, indirect_bid_1, indirect_ask_1))
+                    logging.info('{}: {} / {}'.format(indirect_pair_2, indirect_bid_2, indirect_ask_2))
                     result = ''
                     results.append(result)
 
