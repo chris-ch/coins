@@ -10,6 +10,7 @@ import base64
 import requests
 
 import pandas
+from decimal import Decimal
 
 _DOMAIN = 'api.kraken.com'
 _API_VERSION = '0'
@@ -150,3 +151,20 @@ def get_deposits():
 
 def get_withdrawals():
     return get_ledgers_info({'type': 'withdrawal'})
+
+
+def parse_flows(withdrawals, deposits):
+    """
+
+    :return:
+    """
+    return None
+
+
+def parse_orders(order_history):
+    """
+
+    :param order_history:
+    :return:
+    """
+    return None

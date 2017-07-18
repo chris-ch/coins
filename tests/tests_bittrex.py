@@ -8,7 +8,7 @@ from decimal import Decimal
 from exchanges.bittrex import parse_orders, parse_flows
 
 
-class TestBittrexPublicAPI(unittest.TestCase):
+class TestBittrexAPI(unittest.TestCase):
     """
     Testing P&L calculation from Bittrex.
     """
