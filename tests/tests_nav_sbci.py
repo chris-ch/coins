@@ -32,12 +32,12 @@ class TestNavSBCI(unittest.TestCase):
 
     def test_balances_pnl(self):
         balances = compute_balances(self._example_withdrawals, self._example_deposits)
-        balances_pnl = compute_balances_pnl('USD', self._example_prices, balances)
+        balances_pnl = compute_balances_pnl('USD', balances, self._example_prices)
         self.assertAlmostEqual(balances_pnl.groupby('asset').sum().loc['START'].sum(), -2.136932, places=6)
 
     def test_pnl_history(self):
         balances = compute_balances(self._example_withdrawals, self._example_deposits)
-        balances_pnl = compute_balances_pnl('USD', self._example_prices, balances)
+        balances_pnl = compute_balances_pnl('USD', balances, self._example_prices)
         pnl_history = compute_pnl_history('USD', self._example_prices, balances_pnl, self._example_order_hist)
         self.assertAlmostEqual(pnl_history.sum(), 7811.912114, places=6)
 

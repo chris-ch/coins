@@ -43,7 +43,21 @@ def compute_balances(withdrawals, deposits):
     return balances
 
 
-def compute_balances_pnl(reporting_currency, prices, balances):
+def extend_balances(reporting_currency, balances, prices):
+    """
+
+    :param balances:
+    :param reporting_currency:
+    :param prices:
+    :return:
+    """
+    prices_selection = _select_prices(reporting_currency, prices)
+    prices_selection = _include_indices(prices_selection, balances).ffill()
+    extended_balances = _include_indices(balances, prices_selection).ffill()
+    return extended_balances, prices_selection
+
+
+def compute_balances_pnl(reporting_currency, balances, prices):
     """
     Output format (data expressed in terms of reporting currency):
 
@@ -59,10 +73,8 @@ def compute_balances_pnl(reporting_currency, prices, balances):
     :param balances:
     :return:
     """
-    prices_selection = _select_prices(reporting_currency, prices)
-    prices_selection = _include_indices(prices_selection, balances).ffill()
-    balances = _include_indices(balances, prices_selection).ffill()
-    performances = prices_selection.diff() * balances.shift()
+    extended_balances, prices_selection = extend_balances(reporting_currency, balances, prices)
+    performances = prices_selection.diff() * extended_balances.shift()
     cum_perf = performances.cumsum()
     formatted = cum_perf.unstack().reset_index().fillna(0).rename(columns={'level_0': 'asset', 0: 'pnl'})
     return formatted
@@ -157,4 +169,4 @@ def compute_pnl_history(reporting_currency, prices, balances_pnl, order_history)
         trades_pnl_by_asset = trades_pnl_by_asset.reindex(columns=balances_pnl_by_asset.columns).fillna(0)
         pnl_history = balances_pnl_by_asset + trades_pnl_by_asset
 
-    return pnl_history.apply(sum, axis=1)
+    return pnl_history

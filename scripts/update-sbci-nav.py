@@ -4,6 +4,7 @@ import logging
 import os
 from os import path
 from datetime import datetime
+import matplotlib
 
 from exchanges import bittrex
 import pandas
@@ -11,7 +12,7 @@ import gspread
 
 from cryptocompare import load_crypto_compare_data
 from gservices import save_sheet, authorize_services
-from sbcireport import compute_pnl_history, compute_balances_pnl, compute_balances
+from sbcireport import compute_pnl_history, compute_balances_pnl, compute_balances, extend_balances
 
 _DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE = os.sep.join(('.', 'google-service-account-creds.json'))
 _DEFAULT_CONFIG_FILE = os.sep.join(('.', 'config.json'))
@@ -20,17 +21,30 @@ _SHEET_TAB_PRICES = 'Prices'
 _SHEET_TAB_PNL = 'PnL'
 
 
-def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history, skip_google_update=False):
+def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history, skip_google_update=False,
+                        pnl_start=None):
+    """
+
+    :param credentials_file:
+    :param spreadsheet_id:
+    :param prices:
+    :param pnl_history:
+    :param skip_google_update:
+    :param pnl_start:
+    :return:
+    """
     if not skip_google_update:
         authorized_http, credentials = authorize_services(credentials_file)
         svc_sheet = gspread.authorize(credentials)
         header_prices = [field for field in prices.reset_index().columns.tolist() if field != 'index']
         logging.info('uploading {} rows for prices data'.format(prices.count().max()))
         price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
-        #save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
+        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
         logging.info('uploading {} rows for pnl data'.format(pnl_history.count().max()))
         pnl_history_records = pandas.DataFrame(pnl_history).reset_index().sort_values('date', ascending=False)
-        pnl_history_records = pnl_history_records[pnl_history_records['date'] > datetime(2017, 6, 1)]
+        if pnl_start is not None:
+            pnl_history_records = pnl_history_records[pnl_history_records['date'] > pnl_start]
+
         header_pnl = ['date', pnl_history.name]
         save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PNL, header_pnl, pnl_history_records.to_dict(orient='records'))
 
@@ -65,10 +79,10 @@ def main():
                         help=help_msg_prices
                         )
     help_msg_ref_cur = 'comma-separated list of reference currencies'
-    parser.add_argument('--reference-currencies',
+    parser.add_argument('--reference-pairs',
                         type=str,
                         help=help_msg_ref_cur,
-                        default='USD,EUR,BTC,ETH'
+                        default='BTC.USD,BTC.EUR,ETH.USD,ETH.EUR'
                         )
     help_msg_rec_prices = 'record prices to indicated file (using pickle)'
     parser.add_argument('--record-prices',
@@ -104,22 +118,36 @@ def main():
 
     deposits, withdrawals, order_history, currencies = bittrex.retrieve_data(api_key, secret_key)
 
+    reference_pairs = [(currency.split('.')[0], currency.split('.')[1]) for currency in args.reference_pairs.split(',')]
+
     if args.prices:
         prices = pandas.read_pickle(args.prices)
 
     else:
-        prices = load_crypto_compare_data(currencies, args.reference_currencies.split(','), args.exchange)
+        reference_currencies = set([currency for pair in reference_pairs for currency in pair])
+        prices = load_crypto_compare_data(currencies, reference_currencies, args.exchange)
         if args.record_prices:
             prices.to_pickle(args.record_prices)
 
     reporting_currency = 'USD'
     balances_by_asset = compute_balances(withdrawals, deposits)
-    balances_pnl = compute_balances_pnl(reporting_currency, prices, balances_by_asset)
-    pnl_history = compute_pnl_history(reporting_currency, prices, balances_pnl, order_history)
-    pnl_history.name = 'Portfolio P&L'
+
+    extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, prices)
+    balances_in_reporting_currency = prices_selection * extended_balances.shift()
+    balances_in_reporting_currency = balances_in_reporting_currency.fillna(0)
+    balances_total = balances_in_reporting_currency.apply(sum, axis=1)
+    balances_total.name = 'Portfolio P&L'
+
+    # balances_pnl = compute_balances_pnl(reporting_currency, balances_by_asset, prices)
+    # pnl_history = compute_pnl_history(reporting_currency, prices, balances_pnl, order_history)
+    # pnl_history.name = 'Portfolio P&L'
 
     config_json = json.load(open(args.config, 'rt'))
-    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, pnl_history, args.skip_google_update)
+    reporting_pairs = ['/'.join(pair) for pair in reference_pairs]
+    remaining_columns = set(prices.columns).difference(set(reporting_pairs))
+    prices.columns = reporting_pairs + list(remaining_columns)
+    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, balances_total,
+                        skip_google_update=args.skip_google_update, pnl_start=datetime(2017, 6, 1))
 
 
 if __name__ == '__main__':
