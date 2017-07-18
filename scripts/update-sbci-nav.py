@@ -145,7 +145,8 @@ def main():
     config_json = json.load(open(args.config, 'rt'))
     reporting_pairs = ['/'.join(pair) for pair in reference_pairs]
     remaining_columns = set(prices.columns).difference(set(reporting_pairs))
-    prices.columns = reporting_pairs + list(remaining_columns)
+    remaining_columns.discard('date')
+    prices.columns = ['date'] + reporting_pairs + list(remaining_columns)
     process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, balances_total,
                         skip_google_update=args.skip_google_update, pnl_start=datetime(2017, 6, 1))
 
