@@ -2,7 +2,6 @@ import pandas
 from collections import defaultdict
 import logging
 
-from exchanges.bittrex import parse_orders, parse_flows
 from pnl import AverageCostProfitAndLoss
 
 
@@ -30,14 +29,12 @@ def _include_indices(target_df, source_df):
     return target_df.reindex(target_df.index.append(source_df.index)).sort_index()
 
 
-def compute_balances(withdrawals, deposits):
+def compute_balances(flows):
     """
 
-    :param withdrawals:
-    :param deposits:
+    :param flows:
     :return:
     """
-    flows = parse_flows(withdrawals, deposits).set_index('date')
     flows_by_asset = flows.pivot(columns='asset', values='amount').apply(pandas.to_numeric)
     balances = flows_by_asset.fillna(0).cumsum()
     return balances
@@ -80,7 +77,7 @@ def compute_balances_pnl(reporting_currency, balances, prices):
     return formatted
 
 
-def compute_trades_pnl(reporting_currency, prices, order_history):
+def compute_trades_pnl(reporting_currency, prices, trades):
     """
     Output format (data expressed in terms of reporting currency):
 
@@ -93,10 +90,9 @@ def compute_trades_pnl(reporting_currency, prices, order_history):
 
     :param reporting_currency:
     :param prices:
-    :param order_history:
+    :param trades:
     :return:
     """
-    trades = parse_orders(order_history)
     logging.debug('loaded orders:\n{}'.format(trades))
     if trades.empty:
         return pandas.DataFrame({'asset': [], 'date': [], 'realized_pnl': [], 'total_pnl': [], 'unrealized_pnl': []})
@@ -140,7 +136,7 @@ def compute_trades_pnl(reporting_currency, prices, order_history):
     return pandas.DataFrame(pnl_data)
 
 
-def compute_pnl_history(reporting_currency, prices, balances_pnl, order_history):
+def compute_pnl_history(reporting_currency, prices, balances_pnl, trades):
     """
     Output format (data expressed in terms of reporting currency):
 
@@ -156,10 +152,10 @@ def compute_pnl_history(reporting_currency, prices, balances_pnl, order_history)
     :param prices:
     :param withdrawals:
     :param deposits:
-    :param order_history:
+    :param trades:
     :return:
     """
-    trades_pnl = compute_trades_pnl(reporting_currency, prices, order_history)
+    trades_pnl = compute_trades_pnl(reporting_currency, prices, trades)
     balances_pnl_by_asset = balances_pnl.groupby(['date', 'asset']).sum().unstack()['pnl']
     if trades_pnl.empty:
         pnl_history = balances_pnl_by_asset

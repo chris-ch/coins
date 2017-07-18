@@ -4,15 +4,15 @@ import logging
 import os
 from os import path
 from datetime import datetime
-import matplotlib
 
 from exchanges import bittrex
 import pandas
 import gspread
 
 from cryptocompare import load_crypto_compare_data
+from exchanges.bittrex import parse_flows, parse_orders
 from gservices import save_sheet, authorize_services
-from sbcireport import compute_pnl_history, compute_balances_pnl, compute_balances, extend_balances
+from sbcireport import compute_balances, extend_balances, compute_balances_pnl, compute_pnl_history
 
 _DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE = os.sep.join(('.', 'google-service-account-creds.json'))
 _DEFAULT_CONFIG_FILE = os.sep.join(('.', 'config.json'))
@@ -117,7 +117,6 @@ def main():
     secret_key = config_json['exchanges']['bittrex']['secret']
 
     deposits, withdrawals, order_history, currencies = bittrex.retrieve_data(api_key, secret_key)
-
     reference_pairs = [(currency.split('.')[0], currency.split('.')[1]) for currency in args.reference_pairs.split(',')]
 
     if args.prices:
@@ -130,7 +129,9 @@ def main():
             prices.to_pickle(args.record_prices)
 
     reporting_currency = 'USD'
-    balances_by_asset = compute_balances(withdrawals, deposits)
+
+    flows = parse_flows(withdrawals, deposits).set_index('date')
+    balances_by_asset = compute_balances(flows)
 
     extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, prices)
     balances_in_reporting_currency = prices_selection * extended_balances.shift()
@@ -138,9 +139,10 @@ def main():
     balances_total = balances_in_reporting_currency.apply(sum, axis=1)
     balances_total.name = 'Portfolio P&L'
 
-    # balances_pnl = compute_balances_pnl(reporting_currency, balances_by_asset, prices)
-    # pnl_history = compute_pnl_history(reporting_currency, prices, balances_pnl, order_history)
-    # pnl_history.name = 'Portfolio P&L'
+    balances_pnl = compute_balances_pnl(reporting_currency, balances_by_asset, prices)
+    trades = parse_orders(order_history)
+    pnl_history = compute_pnl_history(reporting_currency, prices, balances_pnl, trades)
+    pnl_history.name = 'Portfolio P&L'
 
     config_json = json.load(open(args.config, 'rt'))
     reporting_pairs = ['/'.join(pair) for pair in reference_pairs]

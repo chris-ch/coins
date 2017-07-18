@@ -64,7 +64,7 @@ def retrieve_data(api_key, secret_key):
     return deposits, withdrawals, order_history, currencies
 
 
-def api_call(method, options=None):
+def _api_call(method, options=None):
     """
 
     :param method:
@@ -98,7 +98,7 @@ def get_balances():
 
     :return:
     """
-    return api_call(_REQUEST_ACCOUNT_BALANCES)
+    return _api_call(_REQUEST_ACCOUNT_BALANCES)
 
 
 def get_order_history():
@@ -106,7 +106,7 @@ def get_order_history():
 
     :return:
     """
-    return api_call(_REQUEST_ORDER_HISTORY)
+    return _api_call(_REQUEST_ORDER_HISTORY)
 
 
 def get_deposit_history():
@@ -114,7 +114,7 @@ def get_deposit_history():
 
     :return:
     """
-    return api_call(_REQUEST_DEPOSIT_HISTORY)
+    return _api_call(_REQUEST_DEPOSIT_HISTORY)
 
 
 def get_withdrawal_history():
@@ -122,7 +122,7 @@ def get_withdrawal_history():
 
     :return:
     """
-    return api_call(_REQUEST_WITHDRAWAL_HISTORY)
+    return _api_call(_REQUEST_WITHDRAWAL_HISTORY)
 
 
 def parse_flows(withdrawals, deposits):
