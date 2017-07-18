@@ -10,7 +10,6 @@ import base64
 import requests
 
 import pandas
-from decimal import Decimal
 
 _DOMAIN = 'api.kraken.com'
 _API_VERSION = '0'
@@ -64,8 +63,12 @@ def _api_call(url_path, options, headers=None):
         logging.error('failed requesting data: status {}'.format(response.status_code))
         response.raise_for_status()
 
-    logging.info('response: "{}"'.format(response.text))
-    return response.json()
+    logging.debug('response: "{}"'.format(response.text))
+    json_data = response.json()
+    if 'result' not in json_data:
+        raise Exception('request failed: {}'.format(json_data))
+
+    return json_data
 
 
 def api_call_public(method, options=None):
@@ -95,6 +98,56 @@ def api_call_private(method, options=None):
     }
 
     return _api_call(url_path, options, headers)
+
+
+def get_tradeable_pairs():
+    """
+
+    :return:
+    """
+    asset_pairs = api_call_public('AssetPairs')['result']
+    records = list()
+    for pair_code, pair_data in asset_pairs.items():
+        record = merge_dicts(pair_data, {'pair_code': pair_code})
+        record.pop('aclass_quote', None)
+        record.pop('aclass_base', None)
+        record.pop('leverage_buy', None)
+        record.pop('leverage_sell', None)
+        record.pop('fees', None)
+        record.pop('fees_maker', None)
+        record.pop('fee_volume_currency', None)
+        records.append(record)
+
+    return pandas.DataFrame(records)
+
+
+def get_order_book(pair, depth=5):
+    """
+    Order book for a given pair.
+
+    :param pair:
+    :param depth:
+    :return:
+    """
+    order_book = api_call_public('Depth', options={'pair': pair, 'count': depth})['result'][pair]
+    bid_side = order_book['bids']
+    ask_side = order_book['asks']
+    bid_records = list()
+    for count, row_data in enumerate(bid_side):
+        price, volume, timestamp = row_data
+        record = {'level': count, 'price': price, 'volume': volume, 'timestamp': datetime.fromtimestamp(timestamp)}
+        bid_records.append(record)
+
+    ask_records = list()
+    for count, row_data in enumerate(ask_side):
+        price, volume, timestamp = row_data
+        record = {'level': count, 'price': price, 'volume': volume, 'timestamp': datetime.fromtimestamp(timestamp)}
+        ask_records.append(record)
+
+    bid_df, ask_df = pandas.DataFrame(bid_records).set_index('level'), pandas.DataFrame(ask_records).set_index('level')
+    bid_df = bid_df[['timestamp', 'price', 'volume']]
+    ask_df = ask_df[['timestamp', 'price', 'volume']]
+    return bid_df, ask_df
 
 
 def get_balances():
@@ -160,6 +213,10 @@ def parse_flows(withdrawals, deposits):
     :param deposits:
     :return:
     """
+    flows_withdrawals = withdrawals[['time', 'asset', 'amount', 'fee']]
+    flows_deposits = withdrawals[['time', 'asset', 'amount', 'fee']]
+    print(flows_withdrawals)
+    print(flows_deposits)
     return None
 
 
@@ -169,5 +226,5 @@ def parse_orders(orders):
     :param orders:
     :return:
     """
-    print()
+    print(orders)
     return None

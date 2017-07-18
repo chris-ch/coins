@@ -20,10 +20,10 @@ class TestKrakenAPI(unittest.TestCase):
         logging.info('loading example withdrawals file: {}'.format(self._withdrawals))
         logging.info('loading example deposits file: {}'.format(self._deposits))
 
-    def test_parsing(self):
-        trades = parse_orders(self._orders)
+    def test_parsing_flows(self):
         flows = parse_flows(self._withdrawals, self._deposits)
-        self.assertAlmostEqual(float(trades[trades['asset'] == 'BTC']['qty'].sum()), 0.01968424)
+        target = pandas.read_pickle(os.path.abspath(os.sep.join(['..', 'output', 'common-flows.pkl'])))
+        print(target)
         self.assertAlmostEqual(float(flows[flows['asset'] == 'NEOS']['amount'].sum()), 0.09736144)
 
     def tearDown(self):
