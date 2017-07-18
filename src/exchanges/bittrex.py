@@ -130,6 +130,8 @@ def get_withdrawal_history():
 def parse_flows(withdrawals, deposits):
     """
 
+    :param withdrawals:
+    :param deposits:
     :return:
     """
     movements = list()
