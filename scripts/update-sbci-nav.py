@@ -9,7 +9,6 @@ import pandas
 import gspread
 
 from cryptocompare import load_crypto_compare_data
-from exchanges import bittrex
 from gservices import save_sheet, authorize_services
 from sbcireport import compute_balances, extend_balances, compute_balances_pnl, compute_pnl_history
 
@@ -115,7 +114,15 @@ def main():
     api_key = config_json['exchanges']['bittrex']['key']
     secret_key = config_json['exchanges']['bittrex']['secret']
 
+    # Exchange-related part ... TODO: make it generic by reading from config file
+    from exchanges import bittrex
+    from exchanges import kraken
     flows, trades, currencies = bittrex.retrieve_data(api_key, secret_key)
+    flows.to_pickle('output/common-flows.pkl')
+    trades.to_pickle('output/common-trades.pkl')
+    logging.info('currencies: {}'.format(currencies))
+    flows_kraken, trades_kraken, currencies_kraken = kraken.retrieve_data(api_key, secret_key)
+    #
 
     reference_pairs = [(currency.split('.')[0], currency.split('.')[1]) for currency in args.reference_pairs.split(',')]
 
