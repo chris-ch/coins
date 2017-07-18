@@ -4,7 +4,7 @@ from os import path
 import argparse
 import os
 
-from exchanges import krakenapi
+from exchanges import kraken
 
 _DEFAULT_CONFIG_FILE = 'config.json'
 
@@ -32,8 +32,8 @@ def main():
     secret_key = config_json['exchanges']['kraken']['secret']
 
 
-    krakenapi.connect(api_key, secret_key)
-    print(krakenapi.get_balances())
+    kraken.connect(api_key, secret_key)
+    print(kraken.get_balances())
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')
