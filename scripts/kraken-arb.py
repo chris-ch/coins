@@ -164,41 +164,41 @@ def sell_currency_using_pair(currency, volume, pair_code, bid, ask):
 
 def calculate_arbitrage_opportunity(direct_ask, direct_bid, direct_pair, indirect_ask_1, indirect_ask_2, indirect_bid_1,
                                     indirect_bid_2, indirect_pair_1, indirect_pair_2):
-    currency_start = direct_pair[4:]
+    currency_initial = direct_pair[4:]
     currency_final = direct_pair[:4]
     initial_bid = direct_bid.iloc[0]
     initial_ask = direct_ask.iloc[0]
-    if currency_start in indirect_pair_1:
+    if currency_initial in indirect_pair_1:
         next_pair = indirect_pair_1
         next_bid = indirect_bid_1.iloc[0]
         next_ask = indirect_ask_1.iloc[0]
-        last_pair = indirect_pair_2
-        last_bid = indirect_bid_2.iloc[0]
-        last_ask = indirect_ask_2.iloc[0]
+        final_pair = indirect_pair_2
+        final_bid = indirect_bid_2.iloc[0]
+        final_ask = indirect_ask_2.iloc[0]
 
     else:
         next_pair = indirect_pair_2
         next_bid = indirect_bid_2.iloc[0]
         next_ask = indirect_ask_2.iloc[0]
-        last_pair = indirect_pair_1
-        last_bid = indirect_bid_1.iloc[0]
-        last_ask = indirect_ask_1.iloc[0]
+        final_pair = indirect_pair_1
+        final_bid = indirect_bid_1.iloc[0]
+        final_ask = indirect_ask_1.iloc[0]
 
-    if next_pair[:4] != currency_start:
+    if next_pair[:4] != currency_initial:
         currency_next = next_pair[:4]
 
     else:
         currency_next = next_pair[4:]
 
-    logging.info('currency start: {}'.format(currency_start))
+    logging.info('currency initial: {}'.format(currency_initial))
     logging.info('currency next: {}'.format(currency_next))
     logging.info('currency final: {}'.format(currency_final))
 
-    balance_initial = buy_currency_using_pair(currency_start, 1, direct_pair, initial_bid, initial_ask)
+    balance_initial = buy_currency_using_pair(currency_initial, 1, direct_pair, initial_bid, initial_ask)
     logging.info('balance 1: {}'.format(balance_initial))
-    balance_transition = sell_currency_using_pair(currency_start, balance_initial[currency_start], next_pair, next_bid, next_ask)
-    logging.info('balance 2: {}'.format(balance_transition))
-    balance_final = sell_currency_using_pair(currency_next, balance_transition[currency_next], last_pair, last_bid, last_ask)
+    balance_next = sell_currency_using_pair(currency_initial, balance_initial[currency_initial], next_pair, next_bid, next_ask)
+    logging.info('balance 2: {}'.format(balance_next))
+    balance_final = sell_currency_using_pair(currency_next, balance_next[currency_next], final_pair, final_bid, final_ask)
     logging.info('balance 3: {}'.format(balance_final))
 
     amount_transition = 0
@@ -208,10 +208,10 @@ def calculate_arbitrage_opportunity(direct_ask, direct_bid, direct_pair, indirec
     if final_ratio > 1:
         logging.info('found profitable strategy')
         logging.info('')
-        logging.info('selling {} {} for {} {}'.format(1, currency_start, amount_transition, currency_next))
+        logging.info('selling {} {} for {} {}'.format(1, currency_initial, amount_transition, currency_next))
         logging.info(
             'selling {} {} for {} {}'.format(amount_transition, currency_next, amount_final, currency_final))
-        logging.info('buying {} {} with {} {}'.format(final_ratio, currency_start, amount_final, currency_final))
+        logging.info('buying {} {} with {} {}'.format(final_ratio, currency_initial, amount_final, currency_final))
         logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(direct_pair, direct_bid.iloc[0],
                                                                 direct_ask.iloc[0]))
         logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(indirect_pair_1, indirect_bid_1.iloc[0],
