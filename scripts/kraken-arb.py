@@ -42,7 +42,7 @@ def main():
     logging.info('available assets: {}'.format(assets))
     results = list()
     for common_leg in assets:
-        logging.info('trying currency {}'.format(common_leg))
+        logging.debug('trying currency {}'.format(common_leg))
         for leg_pair1 in assets:
             if leg_pair1 == common_leg:
                 continue
@@ -58,13 +58,63 @@ def main():
                     logging.info('trying pair {} with {} and {}'.format(direct_pair, indirect_pair_1, indirect_pair_2))
                     sleep(1)
                     direct_bid, direct_ask = get_order_book(direct_pair)
+                    if direct_bid is None or direct_ask is None:
+                        continue
+
                     sleep(1)
                     indirect_bid_1, indirect_ask_1 = get_order_book(indirect_pair_1)
+                    if indirect_bid_1 is None or indirect_ask_1 is None:
+                        continue
+
                     sleep(1)
                     indirect_bid_2, indirect_ask_2 = get_order_book(indirect_pair_2)
-                    logging.info('{}: {} / {}'.format(direct_pair, direct_bid, direct_ask))
-                    logging.info('{}: {} / {}'.format(indirect_pair_1, indirect_bid_1, indirect_ask_1))
-                    logging.info('{}: {} / {}'.format(indirect_pair_2, indirect_bid_2, indirect_ask_2))
+                    if indirect_bid_2 is None or indirect_ask_2 is None:
+                        continue
+
+                    logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(direct_pair, direct_bid.iloc[0], direct_ask.iloc[0]))
+                    logging.info('{}\n -->  bid:\n{}\n --> ask:\n {}'.format(indirect_pair_1, indirect_bid_1.iloc[0], indirect_ask_1.iloc[0]))
+                    logging.info('{}\n -->  bid:\n{}\n --> ask:\n {}'.format(indirect_pair_2, indirect_bid_2.iloc[0], indirect_ask_2.iloc[0]))
+
+                    currency_start = direct_pair[:4]
+                    currency_transition = direct_pair[4:]
+
+                    amount_transition = direct_bid.iloc[0]['price']
+                    logging.info('buying 1 {} paid with {} {}'.format(currency_start, amount_transition, currency_transition))
+
+                    if currency_transition in indirect_pair_1:
+                        next_pair = indirect_pair_1
+                        next_bid = indirect_bid_1.iloc[0]
+                        next_ask = indirect_ask_1.iloc[0]
+                        last_pair = indirect_pair_2
+                        last_bid = indirect_bid_2.iloc[0]
+                        last_ask = indirect_ask_2.iloc[0]
+
+                    else:
+                        next_pair = indirect_pair_2
+                        next_bid = indirect_bid_2.iloc[0]
+                        next_ask = indirect_ask_2.iloc[0]
+                        last_pair = indirect_pair_1
+                        last_bid = indirect_bid_1.iloc[0]
+                        last_ask = indirect_ask_1.iloc[0]
+
+                    if next_pair.startswith(currency_transition):
+                        currency_final = next_pair[4:]
+                        amount_final = amount_transition * next_bid['price']
+
+                    else:
+                        currency_final = next_pair[:4]
+                        amount_final = amount_transition * next_ask['price']
+
+                    logging.info('buying {} {} with {} {}'.format(amount_transition, currency_transition, amount_final, currency_final))
+
+                    if last_pair.startswith(currency_final):
+                        amount_start = last_bid['price']
+
+                    else:
+                        amount_start = last_ask['price']
+
+                    logging.info('buying 1 {} with {} {}'.format(currency_start, amount_start, currency_final))
+
                     result = ''
                     results.append(result)
 

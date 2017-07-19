@@ -1,15 +1,16 @@
 import urllib.parse
 import logging
-import time
 from datetime import datetime
+import time
 
 import hashlib
 import hmac
 import base64
 
 import requests
-
 import pandas
+import tenacity
+from decimal import Decimal
 
 _DOMAIN = 'api.kraken.com'
 _API_VERSION = '0'
@@ -49,6 +50,10 @@ def connect(api_key, secret_key):
     _requests_session = requests.session()
 
 
+@tenacity.retry(wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 3),
+                retry=tenacity.retry_if_exception_type(requests.HTTPError),
+                stop=tenacity.stop_after_attempt(5)
+                )
 def _api_call(url_path, options, headers=None):
     if _requests_session is None:
         raise Exception('not initialized: call connect(api_key, secret_key) first')
@@ -64,7 +69,7 @@ def _api_call(url_path, options, headers=None):
         response.raise_for_status()
 
     logging.debug('response: "{}"'.format(response.text))
-    json_data = response.json()
+    json_data = response.json(parse_float=Decimal)
     if 'result' not in json_data:
         raise Exception('request failed: {}'.format(json_data))
 
@@ -135,16 +140,21 @@ def get_order_book(pair, depth=5):
     bid_records = list()
     for count, row_data in enumerate(bid_side):
         price, volume, timestamp = row_data
-        record = {'level': count, 'price': price, 'volume': volume, 'timestamp': datetime.fromtimestamp(timestamp)}
+        record = {'level': count, 'price': Decimal(price), 'volume': Decimal(volume), 'timestamp': datetime.fromtimestamp(timestamp)}
         bid_records.append(record)
 
     ask_records = list()
     for count, row_data in enumerate(ask_side):
         price, volume, timestamp = row_data
-        record = {'level': count, 'price': price, 'volume': volume, 'timestamp': datetime.fromtimestamp(timestamp)}
+        record = {'level': count, 'price': Decimal(price), 'volume': Decimal(volume), 'timestamp': datetime.fromtimestamp(timestamp)}
         ask_records.append(record)
 
-    bid_df, ask_df = pandas.DataFrame(bid_records).set_index('level'), pandas.DataFrame(ask_records).set_index('level')
+    bid_df, ask_df = pandas.DataFrame(bid_records), pandas.DataFrame(ask_records)
+    if bid_df.empty or ask_df.empty:
+        return None, None
+
+    bid_df.set_index('level', inplace=True)
+    ask_df.set_index('level', inplace=True)
     bid_df = bid_df[['timestamp', 'price', 'volume']]
     ask_df = ask_df[['timestamp', 'price', 'volume']]
     return bid_df, ask_df
