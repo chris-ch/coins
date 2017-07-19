@@ -71,58 +71,155 @@ def main():
                     if indirect_bid_2 is None or indirect_ask_2 is None:
                         continue
 
-                    currency_start = direct_pair[:4]
-                    currency_transition = direct_pair[4:]
-                    amount_transition = direct_ask.iloc[0]['price']
-
-                    if currency_transition in indirect_pair_1:
-                        next_pair = indirect_pair_1
-                        next_bid = indirect_bid_1.iloc[0]
-                        next_ask = indirect_ask_1.iloc[0]
-                        last_pair = indirect_pair_2
-                        last_bid = indirect_bid_2.iloc[0]
-                        last_ask = indirect_ask_2.iloc[0]
-
-                    else:
-                        next_pair = indirect_pair_2
-                        next_bid = indirect_bid_2.iloc[0]
-                        next_ask = indirect_ask_2.iloc[0]
-                        last_pair = indirect_pair_1
-                        last_bid = indirect_bid_1.iloc[0]
-                        last_ask = indirect_ask_1.iloc[0]
-
-                    if next_pair.startswith(currency_transition):
-                        currency_final = next_pair[4:]
-                        amount_final = amount_transition * next_ask['price']
-
-                    else:
-                        currency_final = next_pair[:4]
-                        amount_final = amount_transition * next_bid['price']
-
-
-                    if last_pair.startswith(currency_final):
-                        amount_start = last_bid['price']
-
-                    else:
-                        amount_start = last_ask['price']
-
-                    final_ratio = amount_final / amount_start
-                    if final_ratio > 1:
-                        logging.info('found profitable strategy')
-                        logging.info('selling 1 {} for {} {}'.format(currency_start, amount_transition, currency_transition))
-                        logging.info('selling {} {} for {} {}'.format(amount_transition, currency_transition, amount_final, currency_final))
-                        logging.info('buying {} {} with {} {}'.format(final_ratio, currency_start, amount_final, currency_final))
-                        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(direct_pair, direct_bid.iloc[0],
-                                                                                direct_ask.iloc[0]))
-                        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(indirect_pair_1, indirect_bid_1.iloc[0],
-                                                                                indirect_ask_1.iloc[0]))
-                        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(indirect_pair_2, indirect_bid_2.iloc[0],
-                                                                                indirect_ask_2.iloc[0]))
+                    arbitrage_ratio = calculate_arbitrage_opportunity(direct_ask, direct_bid, direct_pair,
+                                                                      indirect_ask_1, indirect_ask_2,
+                                                                      indirect_bid_1, indirect_bid_2, indirect_pair_1,
+                                                                      indirect_pair_2)
 
                     result = ''
                     results.append(result)
 
     logging.info('results:\n{}'.format(results))
+
+
+def trade_pair(pair_code, bid, ask, volume):
+    """
+    Computes the balance after the operation takes place.
+    Example:
+        XXLMXXBT 38092.21 0.000008210 0.000008340 121.618 --> With a volume of 1 we go long 0.000008210 XXBT and short 1 XXLM
+
+    :param pair_code:
+    :param bid:
+    :param ask:
+    :param volume:
+    :return:
+    """
+    currency_first = pair_code[:4]
+    currency_second = pair_code[4:]
+    result = {currency_first: 0, currency_second: 0}
+    if volume > 0:
+        allowed_volume = min(volume, bid['volume'])
+        if allowed_volume < volume:
+            logging.warning('volume capped at {} instead of expected {}'.format(allowed_volume, volume))
+
+        result = {currency_first: allowed_volume * -1, currency_second: allowed_volume * bid['price']}
+
+    elif volume < 0:
+        allowed_volume = min(abs(volume), ask['volume'])
+        if allowed_volume < abs(volume):
+            logging.warning('volume capped at {} instead of expected {}'.format(allowed_volume, abs(volume)))
+
+        result = {currency_first: allowed_volume, currency_second: allowed_volume * ask['price'] * -1}
+
+    return result
+
+
+def buy_currency_using_pair(currency, volume, pair_code, bid, ask):
+    """
+
+    :param currency:
+    :param volume: amount to buy denominated in currency
+    :param pair_code:
+    :param bid:
+    :param ask:
+    :return:
+    """
+    logging.info('buying {} {} using {}'.format(volume, currency, pair_code))
+    if pair_code[4:] == currency:
+        # Direct quotation
+        logging.info('direct quotation')
+        result = trade_pair(pair_code, bid, ask, volume / bid['price'])
+
+    else:
+        # Indirect quotation
+        logging.info('indirect quotation')
+        result = trade_pair(pair_code, bid, ask, volume * -1)
+
+    return result
+
+
+def sell_currency_using_pair(currency, volume, pair_code, bid, ask):
+    """
+
+    :param currency:
+    :param volume: amount to buy denominated in currency
+    :param pair_code:
+    :param bid:
+    :param ask:
+    :return:
+    """
+    logging.info('selling {} {} using {}'.format(volume, currency, pair_code))
+    if pair_code[4:] == currency:
+        # Direct quotation
+        logging.info('direct quotation')
+        result = trade_pair(pair_code, bid, ask, -1 * volume / ask['price'])
+
+    else:
+        # Indirect quotation
+        logging.info('indirect quotation')
+        result = trade_pair(pair_code, bid, ask, volume)
+
+    return result
+
+
+def calculate_arbitrage_opportunity(direct_ask, direct_bid, direct_pair, indirect_ask_1, indirect_ask_2, indirect_bid_1,
+                                    indirect_bid_2, indirect_pair_1, indirect_pair_2):
+    currency_start = direct_pair[4:]
+    currency_final = direct_pair[:4]
+    initial_bid = direct_bid.iloc[0]
+    initial_ask = direct_ask.iloc[0]
+    if currency_start in indirect_pair_1:
+        next_pair = indirect_pair_1
+        next_bid = indirect_bid_1.iloc[0]
+        next_ask = indirect_ask_1.iloc[0]
+        last_pair = indirect_pair_2
+        last_bid = indirect_bid_2.iloc[0]
+        last_ask = indirect_ask_2.iloc[0]
+
+    else:
+        next_pair = indirect_pair_2
+        next_bid = indirect_bid_2.iloc[0]
+        next_ask = indirect_ask_2.iloc[0]
+        last_pair = indirect_pair_1
+        last_bid = indirect_bid_1.iloc[0]
+        last_ask = indirect_ask_1.iloc[0]
+
+    if next_pair[:4] != currency_start:
+        currency_next = next_pair[:4]
+
+    else:
+        currency_next = next_pair[4:]
+
+    logging.info('currency start: {}'.format(currency_start))
+    logging.info('currency next: {}'.format(currency_next))
+    logging.info('currency final: {}'.format(currency_final))
+
+    balance_initial = buy_currency_using_pair(currency_start, 1, direct_pair, initial_bid, initial_ask)
+    logging.info('balance 1: {}'.format(balance_initial))
+    balance_transition = sell_currency_using_pair(currency_start, balance_initial[currency_start], next_pair, next_bid, next_ask)
+    logging.info('balance 2: {}'.format(balance_transition))
+    balance_final = sell_currency_using_pair(currency_next, balance_transition[currency_next], last_pair, last_bid, last_ask)
+    logging.info('balance 3: {}'.format(balance_final))
+
+    amount_transition = 0
+    amount_final = 0
+    currency_final = 0
+    final_ratio = 0
+    if final_ratio > 1:
+        logging.info('found profitable strategy')
+        logging.info('')
+        logging.info('selling {} {} for {} {}'.format(1, currency_start, amount_transition, currency_next))
+        logging.info(
+            'selling {} {} for {} {}'.format(amount_transition, currency_next, amount_final, currency_final))
+        logging.info('buying {} {} with {} {}'.format(final_ratio, currency_start, amount_final, currency_final))
+        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(direct_pair, direct_bid.iloc[0],
+                                                                direct_ask.iloc[0]))
+        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(indirect_pair_1, indirect_bid_1.iloc[0],
+                                                                indirect_ask_1.iloc[0]))
+        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(indirect_pair_2, indirect_bid_2.iloc[0],
+                                                                indirect_ask_2.iloc[0]))
+
+    return final_ratio
 
 
 if __name__ == '__main__':
