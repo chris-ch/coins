@@ -71,15 +71,9 @@ def main():
                     if indirect_bid_2 is None or indirect_ask_2 is None:
                         continue
 
-                    logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(direct_pair, direct_bid.iloc[0], direct_ask.iloc[0]))
-                    logging.info('{}\n -->  bid:\n{}\n --> ask:\n {}'.format(indirect_pair_1, indirect_bid_1.iloc[0], indirect_ask_1.iloc[0]))
-                    logging.info('{}\n -->  bid:\n{}\n --> ask:\n {}'.format(indirect_pair_2, indirect_bid_2.iloc[0], indirect_ask_2.iloc[0]))
-
                     currency_start = direct_pair[:4]
                     currency_transition = direct_pair[4:]
-
                     amount_transition = direct_ask.iloc[0]['price']
-                    logging.info('selling 1 {} for {} {}'.format(currency_start, amount_transition, currency_transition))
 
                     if currency_transition in indirect_pair_1:
                         next_pair = indirect_pair_1
@@ -105,7 +99,6 @@ def main():
                         currency_final = next_pair[:4]
                         amount_final = amount_transition * next_bid['price']
 
-                    logging.info('selling {} {} for {} {}'.format(amount_transition, currency_transition, amount_final, currency_final))
 
                     if last_pair.startswith(currency_final):
                         amount_start = last_bid['price']
@@ -114,7 +107,17 @@ def main():
                         amount_start = last_ask['price']
 
                     final_ratio = amount_final / amount_start
-                    logging.info('buying {} {} with {} {}'.format(final_ratio, currency_start, amount_final, currency_final))
+                    if final_ratio > 1:
+                        logging.info('found profitable strategy')
+                        logging.info('selling 1 {} for {} {}'.format(currency_start, amount_transition, currency_transition))
+                        logging.info('selling {} {} for {} {}'.format(amount_transition, currency_transition, amount_final, currency_final))
+                        logging.info('buying {} {} with {} {}'.format(final_ratio, currency_start, amount_final, currency_final))
+                        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(direct_pair, direct_bid.iloc[0],
+                                                                                direct_ask.iloc[0]))
+                        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(indirect_pair_1, indirect_bid_1.iloc[0],
+                                                                                indirect_ask_1.iloc[0]))
+                        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(indirect_pair_2, indirect_bid_2.iloc[0],
+                                                                                indirect_ask_2.iloc[0]))
 
                     result = ''
                     results.append(result)
