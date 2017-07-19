@@ -78,8 +78,8 @@ def main():
                     currency_start = direct_pair[:4]
                     currency_transition = direct_pair[4:]
 
-                    amount_transition = direct_bid.iloc[0]['price']
-                    logging.info('buying 1 {} paid with {} {}'.format(currency_start, amount_transition, currency_transition))
+                    amount_transition = direct_ask.iloc[0]['price']
+                    logging.info('selling 1 {} for {} {}'.format(currency_start, amount_transition, currency_transition))
 
                     if currency_transition in indirect_pair_1:
                         next_pair = indirect_pair_1
@@ -99,13 +99,13 @@ def main():
 
                     if next_pair.startswith(currency_transition):
                         currency_final = next_pair[4:]
-                        amount_final = amount_transition * next_bid['price']
+                        amount_final = amount_transition * next_ask['price']
 
                     else:
                         currency_final = next_pair[:4]
-                        amount_final = amount_transition * next_ask['price']
+                        amount_final = amount_transition * next_bid['price']
 
-                    logging.info('buying {} {} with {} {}'.format(amount_transition, currency_transition, amount_final, currency_final))
+                    logging.info('selling {} {} for {} {}'.format(amount_transition, currency_transition, amount_final, currency_final))
 
                     if last_pair.startswith(currency_final):
                         amount_start = last_bid['price']
@@ -113,7 +113,8 @@ def main():
                     else:
                         amount_start = last_ask['price']
 
-                    logging.info('buying 1 {} with {} {}'.format(currency_start, amount_start, currency_final))
+                    final_ratio = amount_final / amount_start
+                    logging.info('buying {} {} with {} {}'.format(final_ratio, currency_start, amount_final, currency_final))
 
                     result = ''
                     results.append(result)
