@@ -1,6 +1,8 @@
 import logging
 from time import sleep
 
+import pandas
+
 
 def trade_pair(pair_code, bid, ask, volume):
     """
@@ -84,8 +86,8 @@ def sell_currency_using_pair(currency, volume, pair_code, bid, ask):
     return result
 
 
-def calculate_arbitrage_opportunity(direct_ask, direct_bid, direct_pair, indirect_ask_1, indirect_ask_2, indirect_bid_1,
-                                    indirect_bid_2, indirect_pair_1, indirect_pair_2):
+def calculate_arbitrage_opportunity(direct_pair, direct_bid, direct_ask, indirect_pair_1, indirect_bid_1,
+                                    indirect_ask_1, indirect_pair_2, indirect_bid_2, indirect_ask_2):
     currency_initial = direct_pair[4:]
     currency_final = direct_pair[:4]
     initial_bid = direct_bid
@@ -123,25 +125,10 @@ def calculate_arbitrage_opportunity(direct_ask, direct_bid, direct_pair, indirec
     balance_final = sell_currency_using_pair(currency_next, balance_next[currency_next], final_pair, final_bid, final_ask)
     logging.info('balance 3: {}'.format(balance_final))
 
-    amount_transition = 0
-    amount_final = 0
-    currency_final = 0
-    final_ratio = 0
-    if final_ratio > 1:
-        logging.info('found profitable strategy')
-        logging.info('')
-        logging.info('selling {} {} for {} {}'.format(1, currency_initial, amount_transition, currency_next))
-        logging.info(
-            'selling {} {} for {} {}'.format(amount_transition, currency_next, amount_final, currency_final))
-        logging.info('buying {} {} with {} {}'.format(final_ratio, currency_initial, amount_final, currency_final))
-        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(direct_pair, direct_bid,
-                                                                direct_ask))
-        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(indirect_pair_1, indirect_bid_1,
-                                                                indirect_ask_1))
-        logging.info('{}\n --> bid:\n{}\n --> ask:\n {}'.format(indirect_pair_2, indirect_bid_2,
-                                                                indirect_ask_2))
-
-    return final_ratio
+    balance1_series = pandas.Series(balance_initial).fillna(0.)
+    balance2_series = pandas.Series(balance_next).fillna(0.)
+    balance3_series = pandas.Series(balance_final).fillna(0.)
+    return 0.
 
 
 def scan_arbitrage_opportunities(tradeable_pairs, order_book_callbak):
@@ -165,26 +152,32 @@ def scan_arbitrage_opportunities(tradeable_pairs, order_book_callbak):
                 indirect_pair_2 = leg_pair2 + common_leg
                 if available_pairs.issuperset({direct_pair, indirect_pair_1, indirect_pair_2}):
                     logging.info('trying pair {} with {} and {}'.format(direct_pair, indirect_pair_1, indirect_pair_2))
-                    sleep(1)
                     direct_bid, direct_ask = order_book_callbak(direct_pair)
                     if direct_bid is None or direct_ask is None:
                         continue
 
-                    sleep(1)
                     indirect_bid_1, indirect_ask_1 = order_book_callbak(indirect_pair_1)
                     if indirect_bid_1 is None or indirect_ask_1 is None:
                         continue
 
-                    sleep(1)
                     indirect_bid_2, indirect_ask_2 = order_book_callbak(indirect_pair_2)
                     if indirect_bid_2 is None or indirect_ask_2 is None:
                         continue
 
-                    arbitrage_ratio = calculate_arbitrage_opportunity(direct_ask, direct_bid, direct_pair,
-                                                                      indirect_ask_1, indirect_ask_2,
-                                                                      indirect_bid_1, indirect_bid_2, indirect_pair_1,
-                                                                      indirect_pair_2)
+                    direct_bid.to_pickle('{}-bid.pkl'.format(direct_pair))
+                    indirect_bid_1.to_pickle('{}-bid.pkl'.format(indirect_pair_1))
+                    indirect_bid_2.to_pickle('{}-bid.pkl'.format(indirect_pair_2))
+                    direct_ask.to_pickle('{}-ask.pkl'.format(direct_pair))
+                    indirect_ask_1.to_pickle('{}-ask.pkl'.format(indirect_pair_1))
+                    indirect_ask_2.to_pickle('{}-ask.pkl'.format(indirect_pair_2))
+                    # XETHXXBT with XETHZCAD and XXBTZCAD
+                    # XXRPXXBT with XXRPZCAD and XXBTZCAD
+                    # XETHXXBT with XETHZJPY and XXBTZJPY
+                    # XXRPXXBT with XXRPZJPY and XXBTZJPY
+                    arbitrage_ratio = calculate_arbitrage_opportunity(direct_pair, direct_bid, direct_ask,
+                                                                      indirect_pair_1, indirect_bid_1, indirect_ask_1,
+                                                                      indirect_pair_2, indirect_bid_2, indirect_ask_2)
 
-                    result = ''
-                    results.append(result)
+                    logging.info('---- completed ----')
+                    results.append(arbitrage_ratio)
     return results
