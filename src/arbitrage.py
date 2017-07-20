@@ -141,10 +141,6 @@ def calculate_arbitrage_opportunity(pair_1, pair_bid_1, pair_ask_1, pair_2, pair
         else:
             currency_next = next_pair[4:]
 
-        logging.info('currency initial: {}'.format(currency_initial))
-        logging.info('currency next: {}'.format(currency_next))
-        logging.info('currency final: {}'.format(currency_final))
-
         balance_initial, trade_initial = buy_currency_using_pair(currency_initial, 1, pairs[first], initial_bid,
                                                                  initial_ask)
         balance_next, trade_next = sell_currency_using_pair(currency_initial, balance_initial[currency_initial],
@@ -157,9 +153,6 @@ def calculate_arbitrage_opportunity(pair_1, pair_bid_1, pair_ask_1, pair_2, pair
         balance3_series = pandas.Series(balance_final, name='final')
         balances = pandas.concat([balance1_series, balance2_series, balance3_series], axis=1)
         trades_df = pandas.DataFrame([trade_initial, trade_next, trade_final])
-        logging.info('balance 1: {}'.format(balance_initial))
-        logging.info('balance 2: {}'.format(balance_next))
-        logging.info('balance 3: {}'.format(balance_final))
         if not skip_capped or trades_df['capped'].count() == 0:
             results.append((trades_df, balances.sum(axis=1)))
 
