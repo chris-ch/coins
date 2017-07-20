@@ -37,13 +37,15 @@ def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history, s
         header_prices = [field for field in prices.reset_index().columns.tolist() if field != 'index']
         logging.info('uploading {} rows for prices data'.format(prices.count().max()))
         price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
-        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
+        #save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
         logging.info('uploading {} rows for pnl data'.format(pnl_history.count().max()))
-        pnl_history_records = pandas.DataFrame(pnl_history).reset_index().sort_values('date', ascending=False)
+        pnl_history_records = pnl_history.reset_index().sort_values('date', ascending=False)
         if pnl_start is not None:
             pnl_history_records = pnl_history_records[pnl_history_records['date'] > pnl_start]
 
-        header_pnl = ['date', pnl_history.name]
+        header_pnl = ['date', 'Portfolio P&L'] + [column for column in pnl_history_records.columns if
+                                                      column not in ('date', 'Portfolio P&L')]
+        pnl_history_records = pnl_history_records[header_pnl]
         save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PNL, header_pnl, pnl_history_records.to_dict(orient='records'))
 
 
@@ -118,10 +120,10 @@ def main():
     from exchanges import bittrex
     from exchanges import kraken
     flows, trades, currencies = bittrex.retrieve_data(api_key, secret_key)
-    flows.to_pickle('output/common-flows.pkl')
-    trades.to_pickle('output/common-trades.pkl')
-    logging.info('currencies: {}'.format(currencies))
-    flows_kraken, trades_kraken, currencies_kraken = kraken.retrieve_data(api_key, secret_key)
+    # flows.to_pickle('output/common-flows.pkl')
+    # trades.to_pickle('output/common-trades.pkl')
+    # logging.info('currencies: {}'.format(currencies))
+    # flows_kraken, trades_kraken, currencies_kraken = kraken.retrieve_data(api_key, secret_key)
     #
 
     reference_pairs = [(currency.split('.')[0], currency.split('.')[1]) for currency in args.reference_pairs.split(',')]
@@ -135,7 +137,7 @@ def main():
         if args.record_prices:
             prices.to_pickle(args.record_prices)
 
-    reporting_currency = 'USD'  # TODO: config param
+    reporting_currency = 'ETH'  # TODO: config param
     fund_inception_date = datetime(2017, 6, 1)  # TODO: config param
 
     balances_by_asset = compute_balances(flows)
@@ -143,9 +145,7 @@ def main():
     extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, prices)
     balances_in_reporting_currency = prices_selection * extended_balances.shift()
     balances_in_reporting_currency = balances_in_reporting_currency.fillna(0)
-    balances_total = balances_in_reporting_currency.apply(sum, axis=1)
-    balances_total.name = 'Portfolio P&L'
-
+    balances_in_reporting_currency['Portfolio P&L'] = balances_in_reporting_currency.apply(sum, axis=1)
     balances_pnl = compute_balances_pnl(reporting_currency, balances_by_asset, prices)
     pnl_history = compute_pnl_history(reporting_currency, prices, balances_pnl, trades)
     pnl_history.name = 'Portfolio P&L'
@@ -155,7 +155,7 @@ def main():
     remaining_columns = set(prices.columns).difference(set(reporting_pairs))
     remaining_columns.discard('date')
     prices = prices[['date'] + reporting_pairs + list(remaining_columns)]
-    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, balances_total,
+    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices, balances_in_reporting_currency,
                         skip_google_update=args.skip_google_update, pnl_start=fund_inception_date)
 
 
