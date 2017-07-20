@@ -108,7 +108,8 @@ def calculate_arbitrage_opportunity(pair_1, pair_bid_1, pair_ask_1, pair_2, pair
     :param pair_3:
     :param pair_bid_3:
     :param pair_ask_3:
-    :return:
+    :param skip_capped:
+    :return: (trades, balances)
     """
     pairs = [pair_1, pair_2, pair_3]
     pair_bids = [pair_bid_1, pair_bid_2, pair_bid_3]
@@ -116,7 +117,6 @@ def calculate_arbitrage_opportunity(pair_1, pair_bid_1, pair_ask_1, pair_2, pair
     results = list()
     for first, second, third in itertools.permutations([0, 1, 2]):
         currency_initial = pairs[first][4:]
-        currency_final = pairs[first][:4]
         initial_bid = pair_bids[first]
         initial_ask = pair_asks[first]
         if currency_initial in pairs[second]:
@@ -192,16 +192,9 @@ def scan_arbitrage_opportunities(tradeable_pairs, order_book_callbak):
                     if indirect_bid_2 is None or indirect_ask_2 is None:
                         continue
 
-                    direct_bid.to_pickle('{}-bid.pkl'.format(direct_pair))
-                    indirect_bid_1.to_pickle('{}-bid.pkl'.format(indirect_pair_1))
-                    indirect_bid_2.to_pickle('{}-bid.pkl'.format(indirect_pair_2))
-                    direct_ask.to_pickle('{}-ask.pkl'.format(direct_pair))
-                    indirect_ask_1.to_pickle('{}-ask.pkl'.format(indirect_pair_1))
-                    indirect_ask_2.to_pickle('{}-ask.pkl'.format(indirect_pair_2))
                     arbitrage_ratio = calculate_arbitrage_opportunity(direct_pair, direct_bid, direct_ask,
                                                                       indirect_pair_1, indirect_bid_1, indirect_ask_1,
                                                                       indirect_pair_2, indirect_bid_2, indirect_ask_2)
 
-                    logging.info('---- completed ----')
                     results.append(arbitrage_ratio)
     return results
