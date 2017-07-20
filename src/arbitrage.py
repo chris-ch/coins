@@ -1,6 +1,8 @@
 import logging
-from time import sleep
 
+import itertools
+
+import numpy
 import pandas
 
 
@@ -18,22 +20,29 @@ def trade_pair(pair_code, bid, ask, volume):
     """
     currency_first = pair_code[:4]
     currency_second = pair_code[4:]
-    result = {currency_first: 0, currency_second: 0}
+    balance = {currency_first: 0, currency_second: 0}
+    trade = None
     if volume > 0:
         allowed_volume = min(volume, bid['volume'])
+        capped = numpy.NaN
         if allowed_volume < volume:
-            logging.warning('volume capped at {} instead of expected {}'.format(allowed_volume, volume))
+            capped = allowed_volume
 
-        result = {currency_first: allowed_volume * -1, currency_second: allowed_volume * bid['price']}
+        balance = {currency_first: allowed_volume * -1, currency_second: allowed_volume * bid['price']}
+        trade = {'direction': 'buy', 'pair': pair_code, 'quantity': allowed_volume, 'price': bid['price'],
+                 'capped': capped}
 
     elif volume < 0:
         allowed_volume = min(abs(volume), ask['volume'])
+        capped = numpy.NaN
         if allowed_volume < abs(volume):
-            logging.warning('volume capped at {} instead of expected {}'.format(allowed_volume, abs(volume)))
+            capped = allowed_volume
 
-        result = {currency_first: allowed_volume, currency_second: allowed_volume * ask['price'] * -1}
+        balance = {currency_first: allowed_volume, currency_second: allowed_volume * ask['price'] * -1}
+        trade = {'direction': 'sell', 'pair': pair_code, 'quantity': allowed_volume, 'price': ask['price'],
+                 'capped': capped}
 
-    return result
+    return balance, trade
 
 
 def buy_currency_using_pair(currency, volume, pair_code, bid, ask):
@@ -51,14 +60,14 @@ def buy_currency_using_pair(currency, volume, pair_code, bid, ask):
         # Direct quotation
         logging.info('direct quotation')
         target_volume = volume / bid['price']
-        result = trade_pair(pair_code, bid, ask, round(target_volume, 10))
+        balance, performed_trade = trade_pair(pair_code, bid, ask, round(target_volume, 10))
 
     else:
         # Indirect quotation
         logging.info('indirect quotation')
-        result = trade_pair(pair_code, bid, ask, volume * -1)
+        balance, performed_trade = trade_pair(pair_code, bid, ask, volume * -1)
 
-    return result
+    return balance, performed_trade
 
 
 def sell_currency_using_pair(currency, volume, pair_code, bid, ask):
@@ -76,59 +85,85 @@ def sell_currency_using_pair(currency, volume, pair_code, bid, ask):
         # Direct quotation
         logging.info('direct quotation')
         target_volume = -1 * volume / ask['price']
-        result = trade_pair(pair_code, bid, ask, round(target_volume, 10))
+        balance, performed_trade = trade_pair(pair_code, bid, ask, round(target_volume, 10))
 
     else:
         # Indirect quotation
         logging.info('indirect quotation')
-        result = trade_pair(pair_code, bid, ask, volume)
+        balance, performed_trade = trade_pair(pair_code, bid, ask, volume)
 
-    return result
+    return balance, performed_trade
 
 
-def calculate_arbitrage_opportunity(direct_pair, direct_bid, direct_ask, indirect_pair_1, indirect_bid_1,
-                                    indirect_ask_1, indirect_pair_2, indirect_bid_2, indirect_ask_2):
-    currency_initial = direct_pair[4:]
-    currency_final = direct_pair[:4]
-    initial_bid = direct_bid
-    initial_ask = direct_ask
-    if currency_initial in indirect_pair_1:
-        next_pair = indirect_pair_1
-        next_bid = indirect_bid_1
-        next_ask = indirect_ask_1
-        final_pair = indirect_pair_2
-        final_bid = indirect_bid_2
-        final_ask = indirect_ask_2
+def calculate_arbitrage_opportunity(pair_1, pair_bid_1, pair_ask_1, pair_2, pair_bid_2, pair_ask_2, pair_3, pair_bid_3,
+                                    pair_ask_3, skip_capped=True):
+    """
 
-    else:
-        next_pair = indirect_pair_2
-        next_bid = indirect_bid_2
-        next_ask = indirect_ask_2
-        final_pair = indirect_pair_1
-        final_bid = indirect_bid_1
-        final_ask = indirect_ask_1
+    :param pair_1:
+    :param pair_bid_1:
+    :param pair_ask_1:
+    :param pair_2:
+    :param pair_bid_2:
+    :param pair_ask_2:
+    :param pair_3:
+    :param pair_bid_3:
+    :param pair_ask_3:
+    :return:
+    """
+    pairs = [pair_1, pair_2, pair_3]
+    pair_bids = [pair_bid_1, pair_bid_2, pair_bid_3]
+    pair_asks = [pair_ask_1, pair_ask_2, pair_ask_3]
+    results = list()
+    for first, second, third in itertools.permutations([0, 1, 2]):
+        currency_initial = pairs[first][4:]
+        currency_final = pairs[first][:4]
+        initial_bid = pair_bids[first]
+        initial_ask = pair_asks[first]
+        if currency_initial in pairs[second]:
+            next_pair = pairs[second]
+            next_bid = pair_bids[second]
+            next_ask = pair_asks[second]
+            final_pair = pairs[third]
+            final_bid = pair_bids[third]
+            final_ask = pair_asks[third]
 
-    if next_pair[:4] != currency_initial:
-        currency_next = next_pair[:4]
+        else:
+            next_pair = pairs[third]
+            next_bid = pair_bids[third]
+            next_ask = pair_asks[third]
+            final_pair = pairs[second]
+            final_bid = pair_bids[second]
+            final_ask = pair_asks[second]
 
-    else:
-        currency_next = next_pair[4:]
+        if next_pair[:4] != currency_initial:
+            currency_next = next_pair[:4]
 
-    logging.info('currency initial: {}'.format(currency_initial))
-    logging.info('currency next: {}'.format(currency_next))
-    logging.info('currency final: {}'.format(currency_final))
+        else:
+            currency_next = next_pair[4:]
 
-    balance_initial = buy_currency_using_pair(currency_initial, 1, direct_pair, initial_bid, initial_ask)
-    logging.info('balance 1: {}'.format(balance_initial))
-    balance_next = sell_currency_using_pair(currency_initial, balance_initial[currency_initial], next_pair, next_bid, next_ask)
-    logging.info('balance 2: {}'.format(balance_next))
-    balance_final = sell_currency_using_pair(currency_next, balance_next[currency_next], final_pair, final_bid, final_ask)
-    logging.info('balance 3: {}'.format(balance_final))
+        logging.info('currency initial: {}'.format(currency_initial))
+        logging.info('currency next: {}'.format(currency_next))
+        logging.info('currency final: {}'.format(currency_final))
 
-    balance1_series = pandas.Series(balance_initial).fillna(0.)
-    balance2_series = pandas.Series(balance_next).fillna(0.)
-    balance3_series = pandas.Series(balance_final).fillna(0.)
-    return 0.
+        balance_initial, trade_initial = buy_currency_using_pair(currency_initial, 1, pairs[first], initial_bid,
+                                                                 initial_ask)
+        balance_next, trade_next = sell_currency_using_pair(currency_initial, balance_initial[currency_initial],
+                                                            next_pair, next_bid, next_ask)
+        balance_final, trade_final = sell_currency_using_pair(currency_next, balance_next[currency_next], final_pair,
+                                                              final_bid, final_ask)
+
+        balance1_series = pandas.Series(balance_initial, name='initial')
+        balance2_series = pandas.Series(balance_next, name='next')
+        balance3_series = pandas.Series(balance_final, name='final')
+        balances = pandas.concat([balance1_series, balance2_series, balance3_series], axis=1)
+        trades_df = pandas.DataFrame([trade_initial, trade_next, trade_final])
+        logging.info('balance 1: {}'.format(balance_initial))
+        logging.info('balance 2: {}'.format(balance_next))
+        logging.info('balance 3: {}'.format(balance_final))
+        if not skip_capped or trades_df['capped'].count() == 0:
+            results.append((trades_df, balances.sum(axis=1)))
+
+    return results
 
 
 def scan_arbitrage_opportunities(tradeable_pairs, order_book_callbak):
@@ -170,10 +205,6 @@ def scan_arbitrage_opportunities(tradeable_pairs, order_book_callbak):
                     direct_ask.to_pickle('{}-ask.pkl'.format(direct_pair))
                     indirect_ask_1.to_pickle('{}-ask.pkl'.format(indirect_pair_1))
                     indirect_ask_2.to_pickle('{}-ask.pkl'.format(indirect_pair_2))
-                    # XETHXXBT with XETHZCAD and XXBTZCAD
-                    # XXRPXXBT with XXRPZCAD and XXBTZCAD
-                    # XETHXXBT with XETHZJPY and XXBTZJPY
-                    # XXRPXXBT with XXRPZJPY and XXBTZJPY
                     arbitrage_ratio = calculate_arbitrage_opportunity(direct_pair, direct_bid, direct_ask,
                                                                       indirect_pair_1, indirect_bid_1, indirect_ask_1,
                                                                       indirect_pair_2, indirect_bid_2, indirect_ask_2)
