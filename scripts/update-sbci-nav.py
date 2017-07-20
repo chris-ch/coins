@@ -31,21 +31,22 @@ def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history, s
     :param pnl_start:
     :return:
     """
+    header_prices = [field for field in prices.reset_index().columns.tolist() if field != 'index']
+    logging.info('uploading {} rows for prices data'.format(prices.count().max()))
+    price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
+    logging.info('uploading {} rows for pnl data'.format(pnl_history.count().max()))
+    pnl_history_records = pnl_history.reset_index().sort_values('date', ascending=False)
+    if pnl_start is not None:
+        pnl_history_records = pnl_history_records[pnl_history_records['date'] > pnl_start]
+
+    header_pnl = ['date', 'Portfolio P&L'] + [column for column in pnl_history_records.columns if
+                                                  column not in ('date', 'Portfolio P&L')]
+    pnl_history_records = pnl_history_records[header_pnl]
+
     if not skip_google_update:
         authorized_http, credentials = authorize_services(credentials_file)
         svc_sheet = gspread.authorize(credentials)
-        header_prices = [field for field in prices.reset_index().columns.tolist() if field != 'index']
-        logging.info('uploading {} rows for prices data'.format(prices.count().max()))
-        price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
-        #save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
-        logging.info('uploading {} rows for pnl data'.format(pnl_history.count().max()))
-        pnl_history_records = pnl_history.reset_index().sort_values('date', ascending=False)
-        if pnl_start is not None:
-            pnl_history_records = pnl_history_records[pnl_history_records['date'] > pnl_start]
-
-        header_pnl = ['date', 'Portfolio P&L'] + [column for column in pnl_history_records.columns if
-                                                      column not in ('date', 'Portfolio P&L')]
-        pnl_history_records = pnl_history_records[header_pnl]
+        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
         save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PNL, header_pnl, pnl_history_records.to_dict(orient='records'))
 
 
