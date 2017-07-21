@@ -33,13 +33,13 @@ class TestNavSBCI(unittest.TestCase):
         self.assertAlmostEqual(pnl_xrp, 85.514073, places=6)
 
     def test_balances_pnl(self):
-        flows = parse_flows(self._example_withdrawals, self._example_deposits).set_index('date')
+        flows = parse_flows(self._example_withdrawals, self._example_deposits)
         balances = compute_balances(flows)
         balances_pnl = compute_balances_pnl('USD', balances, self._example_prices)
         self.assertAlmostEqual(balances_pnl.groupby('asset').sum().loc['START'].sum(), -2.136932, places=6)
 
     def test_pnl_history(self):
-        flows = parse_flows(self._example_withdrawals, self._example_deposits).set_index('date')
+        flows = parse_flows(self._example_withdrawals, self._example_deposits)
         balances = compute_balances(flows)
         balances_pnl = compute_balances_pnl('USD', balances, self._example_prices)
         trades = parse_orders(self._example_order_hist)
@@ -47,7 +47,7 @@ class TestNavSBCI(unittest.TestCase):
         self.assertAlmostEqual(pnl_history.sum()['STRAT'], -470.379621, places=6)
 
     def test_pnl_history_no_trades(self):
-        flows = parse_flows(self._example_withdrawals, self._example_deposits).set_index('date')
+        flows = parse_flows(self._example_withdrawals, self._example_deposits)
         balances = compute_balances(flows)
         balances_pnl = compute_balances_pnl('USD', balances, self._example_prices)
         trades = pandas.DataFrame()

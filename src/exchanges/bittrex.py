@@ -27,7 +27,8 @@ def retrieve_data(api_key, secret_key):
 
     :param api_key:
     :param secret_key:
-    :return: (flows, trades, currencies)
+    :return: (flows: DataFrame ('date'>, 'amount', 'asset', 'fee', 'exchange'), trades: DataFrame ('date',
+    'asset', 'qty', 'fee', 'exchange'), currencies: set of currency codes)
     """
     connect(api_key, secret_key)
     deposits = get_deposit_history()
@@ -45,7 +46,7 @@ def retrieve_data(api_key, secret_key):
         flows_currencies = set(flows_parsed['asset'].tolist())
 
     currencies = flows_currencies.union(orders_currencies)
-    flows = parse_flows(withdrawals, deposits).set_index('date')
+    flows = parse_flows(withdrawals, deposits)
     trades = parse_orders(order_history)
 
     return flows, trades, currencies
@@ -132,7 +133,7 @@ def parse_flows(withdrawals, deposits):
 
     :param withdrawals:
     :param deposits:
-    :return:
+    :return: DataFrame ('date', 'amount', 'asset', 'fee', 'exchange')
     """
     movements = list()
     for withdrawal in withdrawals:
@@ -154,6 +155,8 @@ def parse_flows(withdrawals, deposits):
         movements.append(item)
 
     flows = pandas.DataFrame(movements)
+    flows['fee'] = 0
+    flows = flows[['date', 'amount', 'asset', 'fee', 'exchange']]
     return flows
 
 
@@ -174,7 +177,7 @@ def parse_orders(order_history):
     """
 
     :param order_history:
-    :return:
+    :return: DataFrame ('date', 'asset', 'qty', 'fee', 'exchange')
     """
     parsed = list()
     logging.debug('processing orders:\n{}'.format(order_history))
@@ -218,17 +221,17 @@ def parse_orders(order_history):
         item_first = {
             'date': datetime.strptime(order['TimeStamp'], '%Y-%m-%dT%H:%M:%S.%f'),
             'asset': first_leg_asset,
-            'qty':  first_leg_qty * sign,
-            'fees': to_decimal(order['Commission']),  # all fees for first leg
+            'qty': first_leg_qty * sign,
+            'fee': to_decimal(order['Commission']),  # all fees for first leg
             'exchange': 'bittrex'
-            }
+        }
         item_second = {
             'date': datetime.strptime(order['TimeStamp'], '%Y-%m-%dT%H:%M:%S.%f'),
             'asset': second_leg_asset,
-            'qty':  second_leg_qty * sign,
-            'fees': 0.,  # all fees for first leg
+            'qty': second_leg_qty * sign,
+            'fee': 0.,  # all fees for first leg
             'exchange': 'bittrex'
-            }
+        }
 
         parsed.append(item_first)
         parsed.append(item_second)

@@ -114,18 +114,26 @@ def main():
         raise RuntimeError('unable to load config file: {}'.format(full_config_path))
 
     config_json = json.load(open(args.config, 'rt'))
-    api_key = config_json['exchanges']['bittrex']['key']
-    secret_key = config_json['exchanges']['bittrex']['secret']
 
     # Exchange-related part ... TODO: make it generic by reading from config file
     from exchanges import bittrex
+    api_key_bittrex = config_json['exchanges']['bittrex']['key']
+    secret_key_bittrex = config_json['exchanges']['bittrex']['secret']
+    flows_bittrex, trades_bittrex, currencies_bittrex = bittrex.retrieve_data(api_key_bittrex, secret_key_bittrex)
+
     from exchanges import kraken
-    flows, trades, currencies = bittrex.retrieve_data(api_key, secret_key)
-    # flows.to_pickle('output/common-flows.pkl')
-    # trades.to_pickle('output/common-trades.pkl')
-    # logging.info('currencies: {}'.format(currencies))
-    # flows_kraken, trades_kraken, currencies_kraken = kraken.retrieve_data(api_key, secret_key)
+    api_key_kraken = config_json['exchanges']['bittrex']['key']
+    secret_key_kraken = config_json['exchanges']['bittrex']['secret']
+    #flows_kraken, trades_kraken, currencies_kraken = kraken.retrieve_data(api_key_kraken, secret_key_kraken)
     #
+
+    #flows = flows_kraken
+    #trades = trades_kraken
+    #currencies = currencies_kraken
+
+    flows = flows_bittrex
+    trades = trades_bittrex
+    currencies = currencies_bittrex
 
     reference_pairs = [(currency.split('.')[0], currency.split('.')[1]) for currency in args.reference_pairs.split(',')]
 

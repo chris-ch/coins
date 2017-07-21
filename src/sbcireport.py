@@ -35,6 +35,7 @@ def compute_balances(flows):
     :param flows:
     :return:
     """
+    flows = flows.set_index('date')
     flows_by_asset = flows.pivot(columns='asset', values='amount').apply(pandas.to_numeric)
     balances = flows_by_asset.fillna(0).cumsum()
     return balances
@@ -106,7 +107,7 @@ def compute_trades_pnl(reporting_currency, prices, trades):
         if timestamp in trades.index:
             current_trades = trades.loc[timestamp]
             for trade_ts, trade_row in current_trades.iterrows():
-                fees = trade_row['fees']
+                fees = trade_row['fee']
                 asset = trade_row['asset']
                 fill_qty = float(trade_row['qty'])
                 fill_price = price_row[asset]

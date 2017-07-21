@@ -32,11 +32,13 @@ def main():
     secret_key = config_json['exchanges']['kraken']['secret']
 
     kraken.connect(api_key, secret_key)
-    balances = kraken.get_balances()
+
     orders = kraken.get_closed_orders()
     deposits = kraken.get_deposits()
     withdrawals = kraken.get_withdrawals()
-    logging.info('balances:\n{}'.format(balances))
+    flows, trades, currencies = kraken.retrieve_data(api_key, secret_key)
+
+    logging.info('flows:\n{}'.format(flows))
     logging.info('orders:\n{}'.format(orders))
     logging.info('deposits:\n{}'.format(deposits))
     logging.info('withdrawals:\n{}'.format(withdrawals))

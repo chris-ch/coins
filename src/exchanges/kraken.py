@@ -26,13 +26,25 @@ def retrieve_data(api_key, secret_key):
 
     :param api_key:
     :param secret_key:
-    :return: (flows, trades, currencies)
+    :return: (flows: DataFrame ('date', 'amount', 'asset', 'fee', 'exchange'), trades, currencies: set of currency codes)
     """
     connect(api_key, secret_key)
-    flows = None
-    trades = None
-    currencies = None
-    return flows, trades, currencies
+
+    orders = get_closed_orders()
+    orders_parsed = parse_orders(orders)
+    orders_currencies = set()
+    if not orders_parsed.empty:
+        orders_currencies = set(orders_parsed['asset'].tolist())
+
+    deposits = get_deposits()
+    withdrawals = get_withdrawals()
+    flows = parse_flows(withdrawals, deposits)
+    flows_currencies = set()
+    if not flows.empty:
+        flows_currencies = set(flows['asset'].tolist())
+
+    currencies = flows_currencies.union(orders_currencies)
+    return flows, orders_parsed, currencies
 
 
 def connect(api_key=None, secret_key=None):
@@ -48,6 +60,7 @@ def connect(api_key=None, secret_key=None):
     _api_key = api_key
     _secret_key = secret_key
     _requests_session = requests.session()
+    logging.info('connected with keys ({}, {})'.format(_api_key, _secret_key))
 
 
 @tenacity.retry(wait=tenacity.wait_fixed(3) + tenacity.wait_random(0, 3),
@@ -71,6 +84,7 @@ def _api_call(url_path, options, headers=None):
     logging.debug('response: "{}"'.format(response.text))
     json_data = response.json(parse_float=Decimal)
     if 'result' not in json_data:
+        logging.error('request "{}" failed (post data: {}, headers: {})'.format(url, options, headers))
         raise Exception('request failed: {}'.format(json_data))
 
     return json_data
@@ -96,7 +110,6 @@ def api_call_private(method, options=None):
     encoded = (str(nonce) + post_data).encode()
     message = url_path.encode() + hashlib.sha256(encoded).digest()
     signature = hmac.new(base64.b64decode(_secret_key), message, hashlib.sha512)
-
     headers = {
         'API-Key': _api_key,
         'API-Sign': base64.b64encode(signature.digest()).decode()
@@ -192,9 +205,15 @@ def get_closed_orders():
             record.pop('starttm')
             record.pop('opentm')
             record['closetm'] = datetime.fromtimestamp(record['closetm'])
+            record['cost'] = Decimal(record['cost'])
+            record['fee'] = Decimal(record['fee'])
+            record['vol_exec'] = Decimal(record['vol_exec'])
+            record['vol'] = Decimal(record['vol'])
+            record['price'] = Decimal(record['price'])
             records.append(record)
 
-    return pandas.DataFrame(records)
+    orders = pandas.DataFrame(records)
+    return orders
 
 
 def get_ledgers_info(options=None):
@@ -221,20 +240,46 @@ def parse_flows(withdrawals, deposits):
 
     :param withdrawals:
     :param deposits:
-    :return:
+    :return: DataFrame ('date', 'amount', 'asset', 'fee', 'exchange')
     """
-    flows_withdrawals = withdrawals[['time', 'asset', 'amount', 'fee']]
-    flows_deposits = withdrawals[['time', 'asset', 'amount', 'fee']]
-    print(flows_withdrawals)
-    print(flows_deposits)
-    return None
+    flows_withdrawals = withdrawals[['time', 'amount', 'asset', 'fee']].rename(columns={'time': 'date'})
+    flows_deposits = deposits[['time', 'amount', 'asset', 'fee']].rename(columns={'time': 'date'})
+    movements = pandas.concat([flows_withdrawals, flows_deposits]).sort_values('date', ascending=False)
+    movements['exchange'] = 'kraken'
+    return movements
 
 
 def parse_orders(orders):
     """
 
     :param orders:
-    :return:
+    :return: DataFrame ('date', 'asset', 'qty', 'fee', 'exchange')
     """
-    print(orders)
-    return None
+    trades = list()
+    for index, order in orders.iterrows():
+        asset_leg1 = order['pair'][:3]
+        asset_leg2 = order['pair'][3:]
+        sign = 1
+        if order['type'] == 'sell':
+            sign = -1
+
+        trade_leg1 = {
+            'date': order['closetm'],
+            'asset': asset_leg1,
+            'qty': order['vol_exec'] * sign,
+            'fee': 0,
+            'exchange': 'kraken'
+        }
+        trade_leg2 = {
+            'date': order['closetm'],
+            'asset': asset_leg2,
+            'qty': order['cost'] * sign * -1,
+            'fee': order['fee'],
+            'exchange': 'kraken'
+        }
+        trades.append(trade_leg1)
+        trades.append(trade_leg2)
+
+    parsed = pandas.DataFrame(trades).sort_values('date', ascending=False)
+    parsed = parsed[['date', 'asset', 'qty', 'fee', 'exchange']]
+    return parsed
