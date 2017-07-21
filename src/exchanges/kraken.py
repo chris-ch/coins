@@ -26,7 +26,7 @@ def retrieve_data(api_key, secret_key):
 
     :param api_key:
     :param secret_key:
-    :return: (flows: DataFrame ('date', 'amount', 'asset', 'fee', 'exchange'), trades, currencies: set of currency codes)
+    :return: (flows: DataFrame ('date', 'amount', 'asset', 'fee', 'exchange'), trades, currencies: set(currency codes))
     """
     connect(api_key, secret_key)
 
@@ -186,10 +186,71 @@ def merge_dicts(dict1, *dicts):
 
 
 def get_closed_orders():
-    closed_orders = api_call_private('ClosedOrders', options={'trades': False, 'closetime': 'close'})['result'][
-        'closed']
+    orders = api_call_private('ClosedOrders', options={'trades': False, 'closetime': 'close'})['result']['closed']
+    return orders
+
+
+def get_ledgers_info(options=None):
+    ledgers_info = api_call_private('Ledgers', options=options)['result']['ledger']
+    return ledgers_info
+
+
+def get_deposits():
+    return get_ledgers_info({'type': 'deposit'})
+
+
+def get_withdrawals():
+    return get_ledgers_info({'type': 'withdrawal'})
+
+
+def translate_currency(kraken_code):
+    mapping = {
+        'ZEUR': 'EUR',
+        'XETH': 'ETH',
+        'XBT': 'BTC'
+    }
+    if kraken_code in mapping:
+        return mapping[kraken_code]
+
+    else:
+        return kraken_code
+
+
+def parse_flows(withdrawals, deposits):
+    """
+
+    :param withdrawals:
+    :param deposits:
+    :return: DataFrame ('date', 'amount', 'asset', 'fee', 'exchange')
+    """
     records = list()
-    for order_id, closed_order in closed_orders.items():
+    for ledger_id, ledger in withdrawals.items():
+        record = merge_dicts(ledger, {'ledger_id': ledger_id})
+        record['date'] = datetime.fromtimestamp(record['time'])
+        record['amount'] = record['amount'] * -1
+        record['asset'] = translate_currency(record['asset'])
+        records.append(record)
+
+    for ledger_id, ledger in deposits.items():
+        record = merge_dicts(ledger, {'ledger_id': ledger_id})
+        record['date'] = datetime.fromtimestamp(record['time'])
+        record['asset'] = translate_currency(record['asset'])
+        records.append(record)
+
+    flows = pandas.DataFrame(records, columns=['date', 'amount', 'asset', 'fee'])
+    movements = flows.sort_values('date', ascending=False)
+    movements['exchange'] = 'kraken'
+    return movements
+
+
+def parse_orders(orders):
+    """
+
+    :param orders:
+    :return: DataFrame ('date', 'asset', 'qty', 'fee', 'exchange')
+    """
+    records = list()
+    for order_id, closed_order in orders.items():
         if closed_order['status'] != 'canceled':
             description = closed_order.pop('descr')
             record = merge_dicts(closed_order, {'order_id': order_id}, description)
@@ -213,48 +274,7 @@ def get_closed_orders():
             records.append(record)
 
     orders = pandas.DataFrame(records)
-    return orders
 
-
-def get_ledgers_info(options=None):
-    ledgers_info = api_call_private('Ledgers', options=options)['result']['ledger']
-    records = list()
-    for ledger_id, ledger in ledgers_info.items():
-        record = merge_dicts(ledger, {'ledger_id': ledger_id})
-        record['time'] = datetime.fromtimestamp(record['time'])
-        records.append(record)
-
-    return pandas.DataFrame(records)
-
-
-def get_deposits():
-    return get_ledgers_info({'type': 'deposit'})
-
-
-def get_withdrawals():
-    return get_ledgers_info({'type': 'withdrawal'})
-
-
-def parse_flows(withdrawals, deposits):
-    """
-
-    :param withdrawals:
-    :param deposits:
-    :return: DataFrame ('date', 'amount', 'asset', 'fee', 'exchange')
-    """
-    flows_withdrawals = withdrawals[['time', 'amount', 'asset', 'fee']].rename(columns={'time': 'date'})
-    flows_deposits = deposits[['time', 'amount', 'asset', 'fee']].rename(columns={'time': 'date'})
-    movements = pandas.concat([flows_withdrawals, flows_deposits]).sort_values('date', ascending=False)
-    movements['exchange'] = 'kraken'
-    return movements
-
-
-def parse_orders(orders):
-    """
-
-    :param orders:
-    :return: DataFrame ('date', 'asset', 'qty', 'fee', 'exchange')
-    """
     trades = list()
     for index, order in orders.iterrows():
         asset_leg1 = order['pair'][:3]
@@ -265,14 +285,14 @@ def parse_orders(orders):
 
         trade_leg1 = {
             'date': order['closetm'],
-            'asset': asset_leg1,
+            'asset': translate_currency(asset_leg1),
             'qty': order['vol_exec'] * sign,
             'fee': 0,
             'exchange': 'kraken'
         }
         trade_leg2 = {
             'date': order['closetm'],
-            'asset': asset_leg2,
+            'asset': translate_currency(asset_leg2),
             'qty': order['cost'] * sign * -1,
             'fee': order['fee'],
             'exchange': 'kraken'

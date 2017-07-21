@@ -100,6 +100,7 @@ def compute_trades_pnl(reporting_currency, prices, trades):
 
     trades = trades.set_index('date')
     prices_selection = _select_prices(reporting_currency, prices)
+    prices_selection[reporting_currency] = 1
     prices_selection = _include_indices(prices_selection, trades).ffill()
     pnl_tracker = defaultdict(AverageCostProfitAndLoss)
     pnl_data = list()
@@ -149,7 +150,7 @@ def compute_pnl_history(reporting_currency, prices, balances_pnl, trades):
       2017-07-17 10:04:06.200048 -2.744481e+06  0.0  0.0  0.0  0.000000  0.000000   0.000000  216.213848
       2017-07-17 10:35:09.143000           NaN  NaN  NaN  NaN       NaN       NaN        NaN         NaN
 
-    :param reporting_currency:
+    :param reporting_currency: str currency code
     :param prices:
     :param withdrawals:
     :param deposits:
