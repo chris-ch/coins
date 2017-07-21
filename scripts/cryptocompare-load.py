@@ -3,8 +3,6 @@ from os import path
 import argparse
 import os
 
-import itertools
-
 from cryptocompare import load_crypto_compare_data
 
 _DEFAULT_CONFIG_FILE = 'config.json'

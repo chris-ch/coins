@@ -35,7 +35,7 @@ def retrieve_data(api_key, secret_key):
     return flows, trades, currencies
 
 
-def connect(api_key, secret_key):
+def connect(api_key=None, secret_key=None):
     """
 
     :param api_key:

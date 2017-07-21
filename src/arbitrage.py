@@ -58,13 +58,13 @@ def buy_currency_using_pair(currency, volume, pair_code, bid, ask):
     logging.info('buying {} {} using {}'.format(volume, currency, pair_code))
     if pair_code[4:] == currency:
         # Direct quotation
-        logging.info('direct quotation')
+        logging.debug('direct quotation')
         target_volume = volume / bid['price']
         balance, performed_trade = trade_pair(pair_code, bid, ask, round(target_volume, 10))
 
     else:
         # Indirect quotation
-        logging.info('indirect quotation')
+        logging.debug('indirect quotation')
         balance, performed_trade = trade_pair(pair_code, bid, ask, volume * -1)
 
     return balance, performed_trade
@@ -83,13 +83,13 @@ def sell_currency_using_pair(currency, volume, pair_code, bid, ask):
     logging.info('selling {} {} using {}'.format(volume, currency, pair_code))
     if pair_code[4:] == currency:
         # Direct quotation
-        logging.info('direct quotation')
+        logging.debug('direct quotation')
         target_volume = -1 * volume / ask['price']
         balance, performed_trade = trade_pair(pair_code, bid, ask, round(target_volume, 10))
 
     else:
         # Indirect quotation
-        logging.info('indirect quotation')
+        logging.debug('indirect quotation')
         balance, performed_trade = trade_pair(pair_code, bid, ask, volume)
 
     return balance, performed_trade
