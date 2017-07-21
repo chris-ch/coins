@@ -167,4 +167,4 @@ def compute_pnl_history(reporting_currency, prices, balances_pnl, trades):
         trades_pnl_by_asset = trades_pnl_by_asset.reindex(columns=balances_pnl_by_asset.columns).fillna(0)
         pnl_history = balances_pnl_by_asset + trades_pnl_by_asset
 
-    return pnl_history
+    return pnl_history.fillna(0)

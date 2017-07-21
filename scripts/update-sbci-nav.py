@@ -155,6 +155,10 @@ def main():
     reporting_currency = 'ETH'  # TODO: config param
     fund_inception_date = datetime(2017, 6, 1)  # TODO: config param
 
+    flows.to_pickle('output/test-flows.pkl')
+    prices.to_pickle('output/test-prices.pkl')
+    trades.to_pickle('output/test-trades.pkl')
+
     balances_by_asset = compute_balances(flows)
     extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, prices)
     balances_in_reporting_currency = prices_selection * extended_balances.shift()
@@ -163,7 +167,7 @@ def main():
     balances_pnl = compute_balances_pnl(reporting_currency, balances_by_asset, prices)
 
     pnl_history = compute_pnl_history(reporting_currency, prices, balances_pnl, trades)
-    pnl_history.name = 'Portfolio P&L'
+    pnl_history['Portfolio P&L'] = pnl_history.apply(sum, axis=1)
 
     process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices_out, balances_in_reporting_currency,
                         skip_google_update=args.skip_google_update, pnl_start=fund_inception_date)

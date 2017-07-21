@@ -14,10 +14,7 @@ class TestKrakenAPI(unittest.TestCase):
     """
 
     def setUp(self):
-        self._deposits = pandas.read_pickle(os.path.abspath(os.sep.join(['tests-data', 'kraken-deposits.pkl'])))
-        self._withdrawals = pandas.read_pickle(os.path.abspath(os.sep.join(['tests-data', 'kraken-withdrawals.pkl'])))
-        logging.info('loading example withdrawals file: {}'.format(self._withdrawals))
-        logging.info('loading example deposits file: {}'.format(self._deposits))
+        pass
 
     def test_parsing_flows(self):
         deposits = {'L4WZSK-XKUFF-ULRXRT': {'refid': 'QCCILXH-7D774O-Z6YXO6', 'time': Decimal('1500621623.3172'),

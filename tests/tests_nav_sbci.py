@@ -25,6 +25,9 @@ class TestNavSBCI(unittest.TestCase):
         self._example_withdrawals = json.load(self._example_withdrawals_file, parse_float=Decimal)
         self._example_deposits = json.load(self._example_deposits_file, parse_float=Decimal)
         self._example_order_hist = json.load(self._example_order_hist_file, parse_float=Decimal)
+        self._test_prices = pandas.read_pickle(os.path.abspath(os.sep.join(['tests-data', 'test-prices.pkl'])))
+        self._test_flows = pandas.read_pickle(os.path.abspath(os.sep.join(['tests-data', 'test-flows.pkl'])))
+        self._test_trades = pandas.read_pickle(os.path.abspath(os.sep.join(['tests-data', 'test-trades.pkl'])))
 
     def test_trades_pnl(self):
         trades = parse_orders(self._example_order_hist)
