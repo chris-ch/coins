@@ -80,23 +80,15 @@ def compute_balances_pnl(reporting_currency, balances, prices):
 
 def compute_trades_pnl(reporting_currency, prices, trades):
     """
-    Output format (data expressed in terms of reporting currency):
-
-              asset                           date  realized_pnl      total_pnl       unrealized_pnl
-      413       XRP     2017-07-17 09:00:00.000000           0.0   2.191488e+02         2.191488e+02
-      414       BTC     2017-07-17 10:00:00.000000           0.0  -2.744735e+06        -2.744735e+06
-      415       XRP     2017-07-17 10:00:00.000000           0.0   2.162138e+02         2.162138e+02
-      416       BTC     2017-07-17 10:04:06.200048           0.0  -2.744481e+06        -2.744481e+06
-      417       XRP     2017-07-17 10:04:06.200048           0.0   2.162138e+02         2.162138e+02
-
     :param reporting_currency:
     :param prices:
     :param trades:
-    :return:
+    :return: DataFrame ('date', 'asset', 'unrealized_pnl', 'realized_pnl', 'total_pnl')
     """
     logging.debug('loaded orders:\n{}'.format(trades))
     if trades.empty:
-        return pandas.DataFrame({'asset': [], 'date': [], 'realized_pnl': [], 'total_pnl': [], 'unrealized_pnl': []})
+        empty = pandas.DataFrame({'asset': [], 'date': [], 'realized_pnl': [], 'total_pnl': [], 'unrealized_pnl': []})
+        return empty[['date', 'asset', 'unrealized_pnl', 'realized_pnl', 'total_pnl']]
 
     trades = trades.set_index('date')
     prices_selection = _select_prices(reporting_currency, prices)
@@ -110,7 +102,7 @@ def compute_trades_pnl(reporting_currency, prices, trades):
             for trade_ts, trade_row in current_trades.iterrows():
                 fees = trade_row['fee']
                 asset = trade_row['asset']
-                fill_qty = float(trade_row['qty'])
+                fill_qty = float(trade_row['amount'])
                 fill_price = price_row[asset]
                 pnl_tracker[asset].add_fill(fill_qty, fill_price, fees)
                 pnl_asset_data = {
@@ -135,7 +127,7 @@ def compute_trades_pnl(reporting_currency, prices, trades):
                 pnl_data.append(pnl_asset_data)
                 logging.info('added pnl data: {}'.format(pnl_asset_data))
 
-    return pandas.DataFrame(pnl_data)
+    return pandas.DataFrame(pnl_data)[['date', 'asset', 'unrealized_pnl', 'realized_pnl', 'total_pnl']]
 
 
 def compute_pnl_history(reporting_currency, prices, balances_pnl, trades):

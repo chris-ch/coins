@@ -5,7 +5,7 @@ import json
 
 from decimal import Decimal
 
-from exchanges.bittrex import parse_orders, parse_flows
+from exchanges.bittrex import parse_trades, parse_flows
 
 
 class TestBittrexAPI(unittest.TestCase):
@@ -28,10 +28,10 @@ class TestBittrexAPI(unittest.TestCase):
         logging.info('loading example deposits file: {}'.format(self._example_deposits))
 
     def test_parsing(self):
-        trades = parse_orders(self._example_order_hist)
+        trades = parse_trades(self._example_order_hist)
         flows = parse_flows(self._example_withdrawals, self._example_deposits)
-        self.assertSequenceEqual(flows.columns.tolist(), ('date', 'amount', 'asset', 'fee', 'exchange'))
-        self.assertAlmostEqual(float(trades[trades['asset'] == 'BTC']['qty'].sum()), 0.01968424)
+        self.assertSequenceEqual(flows.columns.tolist(), ('date', 'asset', 'amount', 'fee', 'exchange'))
+        self.assertAlmostEqual(float(trades[trades['asset'] == 'BTC']['amount'].sum()), 0.01968424)
         self.assertAlmostEqual(float(flows[flows['asset'] == 'NEOS']['amount'].sum()), 0.09736144)
 
     def tearDown(self):

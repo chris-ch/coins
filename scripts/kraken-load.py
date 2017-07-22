@@ -4,12 +4,7 @@ from os import path
 import argparse
 import os
 
-from datetime import datetime
-import time
-from decimal import Decimal
-
 from exchanges import kraken
-from exchanges.kraken import api_call_private
 
 _DEFAULT_CONFIG_FILE = 'config.json'
 
@@ -37,17 +32,13 @@ def main():
     secret_key = config_json['exchanges']['kraken']['secret']
 
     kraken.connect(api_key, secret_key)
-
-    orders = kraken.get_trades_history()
-    deposits = kraken.get_deposits()
-    withdrawals = kraken.get_withdrawals()
     flows, trades, currencies = kraken.retrieve_data(api_key, secret_key)
     trades.to_pickle('output/test-trades.pkl')
+    flows.to_pickle('output/test-flows.pkl')
 
     logging.info('flows:\n{}'.format(flows))
-    logging.info('orders:\n{}'.format(orders))
-    logging.info('deposits:\n{}'.format(deposits))
-    logging.info('withdrawals:\n{}'.format(withdrawals))
+    logging.info('trades:\n{}'.format(trades))
+    logging.info('currencies:\n{}'.format(currencies))
 
 
 if __name__ == '__main__':

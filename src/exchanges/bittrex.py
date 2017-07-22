@@ -27,15 +27,15 @@ def retrieve_data(api_key, secret_key):
 
     :param api_key:
     :param secret_key:
-    :return: (flows: DataFrame ('date'>, 'amount', 'asset', 'fee', 'exchange'), trades: DataFrame ('date',
-    'asset', 'qty', 'fee', 'exchange'), currencies: set of currency codes)
+    :return: (flows: DataFrame ('date', 'asset', 'amount', 'fee', 'exchange'), trades: DataFrame ('date', 'asset',
+    'amount', 'fee', 'exchange'), currencies: set of currency codes)
     """
     connect(api_key, secret_key)
     deposits = get_deposit_history()
     withdrawals = get_withdrawal_history()
     order_history = get_order_history()
 
-    orders_parsed = parse_orders(order_history)
+    orders_parsed = parse_trades(order_history)
     orders_currencies = set()
     if not orders_parsed.empty:
         orders_currencies = set(orders_parsed['asset'].tolist())
@@ -47,7 +47,7 @@ def retrieve_data(api_key, secret_key):
 
     currencies = flows_currencies.union(orders_currencies)
     flows = parse_flows(withdrawals, deposits)
-    trades = parse_orders(order_history)
+    trades = parse_trades(order_history)
 
     return flows, trades, currencies
 
@@ -156,8 +156,7 @@ def parse_flows(withdrawals, deposits):
 
     flows = pandas.DataFrame(movements)
     flows['fee'] = 0
-    flows = flows[['date', 'amount', 'asset', 'fee', 'exchange']]
-    return flows
+    return flows[['date', 'asset', 'amount', 'fee', 'exchange']]
 
 
 def to_decimal(value):
@@ -173,11 +172,11 @@ def to_decimal(value):
     return output
 
 
-def parse_orders(order_history):
+def parse_trades(order_history):
     """
 
     :param order_history:
-    :return: DataFrame ('date', 'asset', 'qty', 'fee', 'exchange')
+    :return: DataFrame ('date', 'asset', 'amount', 'fee', 'exchange')
     """
     parsed = list()
     logging.debug('processing orders:\n{}'.format(order_history))
@@ -221,14 +220,14 @@ def parse_orders(order_history):
         item_first = {
             'date': datetime.strptime(order['TimeStamp'], '%Y-%m-%dT%H:%M:%S.%f'),
             'asset': first_leg_asset,
-            'qty': first_leg_qty * sign,
+            'amount': first_leg_qty * sign,
             'fee': to_decimal(order['Commission']),  # all fees for first leg
             'exchange': 'bittrex'
         }
         item_second = {
             'date': datetime.strptime(order['TimeStamp'], '%Y-%m-%dT%H:%M:%S.%f'),
             'asset': second_leg_asset,
-            'qty': second_leg_qty * sign,
+            'amount': second_leg_qty * sign,
             'fee': 0.,  # all fees for first leg
             'exchange': 'bittrex'
         }
@@ -237,4 +236,4 @@ def parse_orders(order_history):
         parsed.append(item_second)
 
     result = pandas.DataFrame(parsed)
-    return result
+    return result[['date', 'asset', 'amount', 'fee', 'exchange']]
