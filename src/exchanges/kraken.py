@@ -30,8 +30,8 @@ def retrieve_data(api_key, secret_key):
     """
     connect(api_key, secret_key)
 
-    orders = get_closed_orders()
-    orders_parsed = parse_orders(orders)
+    orders = get_trades_history()
+    orders_parsed = parse_trades(orders)
     orders_currencies = set()
     if not orders_parsed.empty:
         orders_currencies = set(orders_parsed['asset'].tolist())
@@ -153,13 +153,15 @@ def get_order_book(pair, depth=5):
     bid_records = list()
     for count, row_data in enumerate(bid_side):
         price, volume, timestamp = row_data
-        record = {'level': count, 'price': Decimal(price), 'volume': Decimal(volume), 'timestamp': datetime.fromtimestamp(timestamp)}
+        record = {'level': count, 'price': Decimal(price), 'volume': Decimal(volume),
+                  'timestamp': datetime.fromtimestamp(timestamp)}
         bid_records.append(record)
 
     ask_records = list()
     for count, row_data in enumerate(ask_side):
         price, volume, timestamp = row_data
-        record = {'level': count, 'price': Decimal(price), 'volume': Decimal(volume), 'timestamp': datetime.fromtimestamp(timestamp)}
+        record = {'level': count, 'price': Decimal(price), 'volume': Decimal(volume),
+                  'timestamp': datetime.fromtimestamp(timestamp)}
         ask_records.append(record)
 
     bid_df, ask_df = pandas.DataFrame(bid_records), pandas.DataFrame(ask_records)
@@ -186,13 +188,18 @@ def merge_dicts(dict1, *dicts):
 
 
 def get_closed_orders():
-    orders = api_call_private('ClosedOrders', options={'trades': False, 'closetime': 'close'})['result']['closed']
+    orders = api_call_private('ClosedOrders', options={'trades': True, 'closetime': 'close'})['result']['closed']
     return orders
 
 
 def get_ledgers_info(options=None):
     ledgers_info = api_call_private('Ledgers', options=options)['result']['ledger']
     return ledgers_info
+
+
+def get_trades_history(options=None):
+    trades = api_call_private('TradesHistory', options=options)['result']['trades']
+    return trades
 
 
 def get_deposits():
@@ -204,10 +211,21 @@ def get_withdrawals():
 
 
 def translate_currency(kraken_code):
+    """
+    Converts from Kraken convention to CryptoCompare.
+
+    TODO: create a values DB for this.
+
+    :param kraken_code:
+    :return:
+    """
     mapping = {
         'ZEUR': 'EUR',
         'XETH': 'ETH',
-        'XBT': 'BTC'
+        'XXRP': 'XRP',
+        'XBT': 'BTC',
+        'XXBT': 'BTC',
+        'XLTC': 'LTC',
     }
     if kraken_code in mapping:
         return mapping[kraken_code]
@@ -243,55 +261,42 @@ def parse_flows(withdrawals, deposits):
     return movements
 
 
-def parse_orders(orders):
+def parse_trades(raw_trades):
     """
 
-    :param orders:
+    :param raw_trades:
     :return: DataFrame ('date', 'asset', 'qty', 'fee', 'exchange')
     """
     records = list()
-    for order_id, closed_order in orders.items():
-        if closed_order['status'] != 'canceled':
-            description = closed_order.pop('descr')
-            record = merge_dicts(closed_order, {'order_id': order_id}, description)
-            record.pop('trades')
-            record.pop('userref')
-            record.pop('status')
-            record.pop('reason')
-            record.pop('refid')
-            record.pop('expiretm')
-            record.pop('misc')
-            record.pop('oflags')
-            record.pop('order')
-            record.pop('starttm')
-            record.pop('opentm')
-            record['closetm'] = datetime.fromtimestamp(record['closetm'])
-            record['cost'] = Decimal(record['cost'])
-            record['fee'] = Decimal(record['fee'])
-            record['vol_exec'] = Decimal(record['vol_exec'])
-            record['vol'] = Decimal(record['vol'])
-            record['price'] = Decimal(record['price'])
-            records.append(record)
-
-    orders = pandas.DataFrame(records)
+    for trade_id, trade in raw_trades.items():
+        record = merge_dicts(trade, {'trade_id': trade_id})
+        record.pop('misc')
+        record.pop('margin')
+        record.pop('ordertype')
+        record['time'] = datetime.fromtimestamp(record['time'])
+        record['cost'] = Decimal(record['cost'])
+        record['fee'] = Decimal(record['fee'])
+        record['vol'] = Decimal(record['vol'])
+        record['price'] = Decimal(record['price'])
+        records.append(record)
 
     trades = list()
-    for index, order in orders.iterrows():
-        asset_leg1 = order['pair'][:3]
-        asset_leg2 = order['pair'][3:]
+    for index, order in pandas.DataFrame(records).iterrows():
+        asset_leg1 = order['pair'][:len(order['pair']) // 2]
+        asset_leg2 = order['pair'][len(order['pair']) // 2:]
         sign = 1
         if order['type'] == 'sell':
             sign = -1
 
         trade_leg1 = {
-            'date': order['closetm'],
+            'date': order['time'],
             'asset': translate_currency(asset_leg1),
-            'qty': order['vol_exec'] * sign,
+            'qty': order['vol'] * sign,
             'fee': 0,
             'exchange': 'kraken'
         }
         trade_leg2 = {
-            'date': order['closetm'],
+            'date': order['time'],
             'asset': translate_currency(asset_leg2),
             'qty': order['cost'] * sign * -1,
             'fee': order['fee'],
@@ -302,4 +307,5 @@ def parse_orders(orders):
 
     parsed = pandas.DataFrame(trades).sort_values('date', ascending=False)
     parsed = parsed[['date', 'asset', 'qty', 'fee', 'exchange']]
+    print(parsed)
     return parsed

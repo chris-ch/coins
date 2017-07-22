@@ -7,7 +7,7 @@ from decimal import Decimal
 import pandas
 
 from exchanges.bittrex import parse_flows, parse_orders
-from sbcireport import compute_trades_pnl, compute_balances_pnl, compute_pnl_history, compute_balances
+from sbcireport import compute_trades_pnl, compute_balances_pnl, compute_pnl_history, compute_balances, extend_balances
 
 
 class TestNavSBCI(unittest.TestCase):
@@ -56,6 +56,19 @@ class TestNavSBCI(unittest.TestCase):
         trades = pandas.DataFrame()
         pnl_history = compute_pnl_history('USD', self._example_prices, balances_pnl, trades)
         self.assertAlmostEqual(pnl_history.sum()['STRAT'], -758.107588, places=6)
+
+    def test_pnl_full(self):
+        balances_by_asset = compute_balances(self._test_flows)
+        reporting_currency = 'EUR'
+        extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, self._test_prices)
+        balances_in_reporting_currency = prices_selection * extended_balances.shift()
+        balances_in_reporting_currency = balances_in_reporting_currency.fillna(0)
+        balances_in_reporting_currency['Portfolio P&L'] = balances_in_reporting_currency.apply(sum, axis=1)
+        balances_pnl = compute_balances_pnl(reporting_currency, balances_by_asset, self._test_prices)
+        print(self._test_trades)
+        pnl_history = compute_pnl_history(reporting_currency, self._test_prices, balances_pnl, self._test_trades)
+        #print(pnl_history.tail())
+        print(self._test_trades)
 
     def tearDown(self):
         self._example_order_hist_file.close()
