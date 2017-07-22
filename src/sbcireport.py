@@ -80,54 +80,60 @@ def compute_balances_pnl(reporting_currency, balances, prices):
 
 def compute_trades_pnl(reporting_currency, prices, trades):
     """
+    Trades P&L by asset expressed in the reporting currency.
+
     :param reporting_currency:
     :param prices:
     :param trades:
-    :return: DataFrame ('date', 'asset', 'unrealized_pnl', 'realized_pnl', 'total_pnl')
+    :return: DataFrame (<index 'date'>, list of asset codes) containing pnl history for each asset
     """
     logging.debug('loaded orders:\n{}'.format(trades))
     if trades.empty:
-        empty = pandas.DataFrame({'asset': [], 'date': [], 'realized_pnl': [], 'total_pnl': [], 'unrealized_pnl': []})
-        return empty[['date', 'asset', 'unrealized_pnl', 'realized_pnl', 'total_pnl']]
+        result = pandas.DataFrame({'asset': [], 'date': [], 'realized_pnl': [], 'total_pnl': [], 'unrealized_pnl': []})
 
-    trades = trades.set_index('date')
-    prices_selection = _select_prices(reporting_currency, prices)
-    prices_selection[reporting_currency] = 1
-    prices_selection = _include_indices(prices_selection, trades).ffill()
-    pnl_tracker = defaultdict(AverageCostProfitAndLoss)
-    pnl_data = list()
-    for timestamp, price_row in prices_selection.iterrows():
-        if timestamp in trades.index:
-            current_trades = trades.loc[timestamp]
-            for trade_ts, trade_row in current_trades.iterrows():
-                fees = trade_row['fee']
-                asset = trade_row['asset']
-                fill_qty = float(trade_row['amount'])
-                fill_price = price_row[asset]
-                pnl_tracker[asset].add_fill(fill_qty, fill_price, fees)
-                pnl_asset_data = {
-                    'date': trade_ts,
-                    'asset': asset,
-                    'unrealized_pnl': pnl_tracker[asset].get_unrealized_pnl(fill_price),
-                    'realized_pnl': pnl_tracker[asset].realized_pnl,
-                    'total_pnl': pnl_tracker[asset].get_total_pnl(fill_price),
-                }
-                pnl_data.append(pnl_asset_data)
-                logging.info('*trade* added pnl data: {}'.format(pnl_asset_data))
+    else:
+        trades = trades.set_index('date')
+        prices_selection = _select_prices(reporting_currency, prices)
+        prices_selection[reporting_currency] = 1
+        prices_selection = _include_indices(prices_selection, trades).ffill()
+        pnl_tracker = defaultdict(AverageCostProfitAndLoss)
+        pnl_data = list()
+        for timestamp, price_row in prices_selection.iterrows():
+            if timestamp in trades.index:
+                current_trades = trades.loc[timestamp]
+                for trade_ts, trade_row in current_trades.iterrows():
+                    fees = trade_row['fee']
+                    asset = trade_row['asset']
+                    fill_qty = float(trade_row['amount'])
+                    fill_price = price_row[asset]
+                    pnl_tracker[asset].add_fill(fill_qty, fill_price, fees)
+                    pnl_asset_data = {
+                        'date': trade_ts,
+                        'asset': asset,
+                        'unrealized_pnl': pnl_tracker[asset].get_unrealized_pnl(fill_price),
+                        'realized_pnl': pnl_tracker[asset].realized_pnl,
+                        'total_pnl': pnl_tracker[asset].get_total_pnl(fill_price),
+                    }
+                    pnl_data.append(pnl_asset_data)
+                    logging.info('*trade* added pnl data: {}'.format(pnl_asset_data))
 
-        else:
-            for asset in pnl_tracker:
-                pnl_asset_data = {
-                    'date': timestamp,
-                    'asset': asset,
-                    'unrealized_pnl': pnl_tracker[asset].get_unrealized_pnl(price_row[asset]),
-                    'realized_pnl': pnl_tracker[asset].realized_pnl,
-                    'total_pnl': pnl_tracker[asset].get_total_pnl(price_row[asset]),
-                }
-                pnl_data.append(pnl_asset_data)
-                logging.info('added pnl data: {}'.format(pnl_asset_data))
+            else:
+                for asset in pnl_tracker:
+                    pnl_asset_data = {
+                        'date': timestamp,
+                        'asset': asset,
+                        'unrealized_pnl': pnl_tracker[asset].get_unrealized_pnl(price_row[asset]),
+                        'realized_pnl': pnl_tracker[asset].realized_pnl,
+                        'total_pnl': pnl_tracker[asset].get_total_pnl(price_row[asset]),
+                    }
+                    pnl_data.append(pnl_asset_data)
+                    logging.info('added pnl data: {}'.format(pnl_asset_data))
 
-    return pandas.DataFrame(pnl_data)[['date', 'asset', 'unrealized_pnl', 'realized_pnl', 'total_pnl']]
+        result = pandas.DataFrame(pnl_data)
+
+    result_filtered = result[['date', 'asset', 'total_pnl']]
+    pnl_by_currency = result_filtered.pivot_table(index='date', columns='asset', values='total_pnl')
+    return pnl_by_currency.ffill()
 
 
 def compute_pnl_history(reporting_currency, prices, balances_pnl, trades):

@@ -30,8 +30,8 @@ class TestNavSBCI(unittest.TestCase):
         self._test_trades = pandas.read_pickle(os.path.abspath(os.sep.join(['tests-data', 'test-trades.pkl'])))
 
     def test_trades_pnl(self):
-        trades = parse_trades(self._example_order_hist)
-        trades_pnl = compute_trades_pnl('USD', self._example_prices, trades)
+        trades_pnl = compute_trades_pnl('USD', self._test_prices, self._test_trades)
+        print(trades_pnl)
         pnl_xrp = trades_pnl[trades_pnl['asset'] == 'XRP'].tail(1)['total_pnl'].sum()
         self.assertAlmostEqual(pnl_xrp, 85.514073, places=6)
 
