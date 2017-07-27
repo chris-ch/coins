@@ -28,7 +28,7 @@ def main():
 
     reference_currencies = ['USD', 'EUR', 'BTC', 'ETH']
     currencies = ['LTC', 'XRP', 'START', 'NEOS', 'STRAT']
-    result = load_crypto_compare_data(currencies, reference_currencies, exchange='CCCAGG')
+    result = load_crypto_compare_data(currencies, reference_currencies, exchange='CCCAGG', time_scale='day')
     result.to_pickle('cryptocompare-prices.pkl')
     logging.info('result:\n{}'.format(result))
 

@@ -236,4 +236,7 @@ def parse_trades(order_history):
         parsed.append(item_second)
 
     result = pandas.DataFrame(parsed)
+    if result.empty:
+        return pandas.DataFrame(columns=['date', 'asset', 'amount', 'fee', 'exchange'])
+
     return result[['date', 'asset', 'amount', 'fee', 'exchange']]
