@@ -15,12 +15,6 @@ def main():
     parser = argparse.ArgumentParser(description='Loading SBCI prices data',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter
                                      )
-    help_msg_pairs = 'additional comma separated pairs of currencies for price retrieval'
-    parser.add_argument('--pairs',
-                        type=str,
-                        help=help_msg_pairs,
-                        default="BTC/USD,ETH/USD,ETH/BTC,USDT/USD"
-                        )
     help_msg_ref_cur = 'comma-separated list of reference currencies'
     parser.add_argument('--reference-pairs',
                         type=str,

@@ -8,15 +8,15 @@ from datetime import datetime
 import pandas
 import gspread
 
-from cryptocompare import load_crypto_compare_data
 from gservices import save_sheet, authorize_services
-from sbcireport import compute_balances, extend_balances, compute_balances_pnl, compute_pnl_history
+from sbcireport import compute_balances, extend_balances
 
-_DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE = os.sep.join(('.', 'google-service-account-creds.json'))
+
 _DEFAULT_CONFIG_FILE = os.sep.join(('.', 'config.json'))
-_DEFAULT_EXCHANGE = 'CCCAGG'
+_DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE = os.sep.join(('.', 'google-service-account-creds.json'))
 _SHEET_TAB_PRICES = 'Prices'
 _SHEET_TAB_PNL = 'PnL'
+_DEFAULT_DATA_PATH = '.'
 
 
 def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history, skip_google_update=False,
@@ -54,13 +54,6 @@ def main():
     parser = argparse.ArgumentParser(description='Updating SCBI spreadsheet',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter
                                      )
-    help_msg_creds = 'location of Google Service Account Credentials file, using "{}" by default'
-    parser.add_argument('--google-creds',
-                        metavar='GOOGLE_SERVICE_ACCOUNT_CREDS_JSON',
-                        type=str,
-                        help=help_msg_creds.format(_DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE),
-                        default=_DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE
-                        )
     help_msg_config = 'location of config file, using "{}" by default'
     parser.add_argument('--config',
                         metavar='CONFIG_JSON',
@@ -68,16 +61,12 @@ def main():
                         help=help_msg_config.format(_DEFAULT_CONFIG_FILE),
                         default=_DEFAULT_CONFIG_FILE
                         )
-    help_msg_pairs = 'additional comma separated pairs of currencies for price retrieval'
-    parser.add_argument('--pairs',
+    help_msg_creds = 'location of Google Service Account Credentials file, using "{}" by default'
+    parser.add_argument('--google-creds',
+                        metavar='GOOGLE_SERVICE_ACCOUNT_CREDS_JSON',
                         type=str,
-                        help=help_msg_pairs,
-                        default="BTC/USD,ETH/USD,ETH/BTC,USDT/USD"
-                        )
-    help_msg_prices = 'use indicated prices (pickled DataFrame) instead of querying CryptoCompare'
-    parser.add_argument('--prices',
-                        type=str,
-                        help=help_msg_prices
+                        help=help_msg_creds.format(_DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE),
+                        default=_DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE
                         )
     help_msg_ref_cur = 'comma-separated list of reference currencies'
     parser.add_argument('--reference-pairs',
@@ -85,21 +74,17 @@ def main():
                         help=help_msg_ref_cur,
                         default='BTC.USD,BTC.EUR,ETH.USD,ETH.EUR'
                         )
-    help_msg_rec_prices = 'record prices to indicated file (using pickle)'
-    parser.add_argument('--record-prices',
-                        type=str,
-                        help=help_msg_rec_prices
-                        )
-    help_msg_prices_exchange = 'exchange for loading prices'
-    parser.add_argument('--exchange',
-                        type=str,
-                        help=help_msg_prices_exchange,
-                        default=_DEFAULT_EXCHANGE
-                        )
     help_msg_skip_google_update = 'skip updating Google Sheet'
     parser.add_argument('--skip-google-update',
                         action='store_true',
                         help=help_msg_skip_google_update
+                        )
+    help_msg_data_path = 'location of data path, using "{}" by default'
+    parser.add_argument('--data',
+                        metavar='DATA_PATH',
+                        type=str,
+                        help=help_msg_data_path.format(_DEFAULT_DATA_PATH),
+                        default=_DEFAULT_DATA_PATH
                         )
 
     args = parser.parse_args()
@@ -108,67 +93,35 @@ def main():
     if not os.path.isfile(full_creds_path):
         raise RuntimeError('unable to load Google Service Account credentials file: {}'.format(full_creds_path))
 
-    full_config_path = os.path.abspath(args.config)
-    logging.info('reading config from "%s"', full_config_path)
-    if not os.path.isfile(full_config_path):
-        raise RuntimeError('unable to load config file: {}'.format(full_config_path))
-
     config_json = json.load(open(args.config, 'rt'))
+    full_data_path = os.path.abspath(args.data)
+    if os.path.isfile(full_data_path):
+        raise RuntimeError('not a directory: {}'.format(full_data_path))
 
-    # Exchange-related part ... TODO: make it generic by reading from config file
-    from exchanges import bittrex
-    api_key_bittrex = config_json['exchanges']['bittrex']['key']
-    secret_key_bittrex = config_json['exchanges']['bittrex']['secret']
-    flows_bittrex, trades_bittrex, currencies_bittrex = bittrex.retrieve_data(api_key_bittrex, secret_key_bittrex)
+    full_data_path = os.path.abspath(args.data)
+    if not os.path.isdir(full_data_path):
+        raise RuntimeError('not a directory: {}'.format(full_data_path))
 
-    #from exchanges import kraken
-    #api_key_kraken = config_json['exchanges']['kraken']['key']
-    #secret_key_kraken = config_json['exchanges']['kraken']['secret']
-    #flows_kraken, trades_kraken, currencies_kraken = kraken.retrieve_data(api_key_kraken, secret_key_kraken)
-
-    #flows = flows_kraken
-    #trades = trades_kraken
-    #currencies = currencies_kraken
-
-    flows = flows_bittrex
-    trades = trades_bittrex
-    currencies = currencies_bittrex
-    #
-
-    exchange = args.exchange
+    flows = pandas.read_pickle(os.sep.join([full_data_path, 'flows.pkl']))
+    prices_daily = pandas.read_pickle(os.sep.join([full_data_path, 'day_prices.pkl']))
+    prices_houry = pandas.read_pickle(os.sep.join([full_data_path, 'hour_prices.pkl']))
+    prices_spot = pandas.read_pickle(os.sep.join([full_data_path, 'spot_prices.pkl']))
+    prices = pandas.concat([prices_daily, prices_houry, prices_spot]).sort_values('date', ascending=False)
     reference_pairs = [(currency.split('.')[0], currency.split('.')[1]) for currency in args.reference_pairs.split(',')]
 
-    if args.prices:
-        prices_daily = pandas.read_pickle(args.prices)
-
-    else:
-        reference_currencies = set([currency for pair in reference_pairs for currency in pair])
-        prices_daily = load_crypto_compare_data(currencies, reference_currencies, exchange, time_scale='day')
-        if args.record_prices:
-            prices_daily.to_pickle(args.record_prices)
-
-    config_json = json.load(open(args.config, 'rt'))
     reporting_pairs = ['/'.join(pair) for pair in reference_pairs]
-    remaining_columns = set(prices_daily.columns).difference(set(reporting_pairs))
+    remaining_columns = set(prices.columns).difference(set(reporting_pairs))
     remaining_columns.discard('date')
-    prices_out = prices_daily[['date'] + reporting_pairs + list(remaining_columns)]
+    prices_out = prices[['date'] + reporting_pairs + list(remaining_columns)]
 
     reporting_currency = 'ETH'  # TODO: config param
     fund_inception_date = datetime(2017, 6, 1)  # TODO: config param
 
-    flows.to_pickle('output/test-flows.pkl')
-    prices_daily.to_pickle('output/test-prices.pkl')
-    trades.to_pickle('output/test-trades.pkl')
-
     balances_by_asset = compute_balances(flows)
-    extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, prices_daily)
+    extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, prices)
     balances_in_reporting_currency = prices_selection * extended_balances.shift()
     balances_in_reporting_currency = balances_in_reporting_currency.fillna(0)
     balances_in_reporting_currency['Portfolio P&L'] = balances_in_reporting_currency.apply(sum, axis=1)
-    balances_pnl = compute_balances_pnl(reporting_currency, balances_by_asset, prices_daily)
-
-    pnl_history = compute_pnl_history(reporting_currency, prices_daily, balances_pnl, trades)
-    pnl_history['Portfolio P&L'] = pnl_history.apply(sum, axis=1)
 
     process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices_out, balances_in_reporting_currency,
                         skip_google_update=args.skip_google_update, pnl_start=fund_inception_date)

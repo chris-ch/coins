@@ -21,12 +21,15 @@ def _select_prices(reporting_currency, prices):
 
 def _include_indices(target_df, source_df):
     """
+    Adds missing indices from source_df into target_df.
 
     :param target_df:
     :param source_df:
     :return:
     """
-    return target_df.reindex(target_df.index.append(source_df.index)).sort_index()
+    complete_index = target_df.index.append(source_df.index)
+    reindexed = target_df.reindex(complete_index)
+    return reindexed.sort_index()
 
 
 def compute_balances(flows):
@@ -50,6 +53,8 @@ def extend_balances(reporting_currency, balances, prices):
     :return:
     """
     prices_selection = _select_prices(reporting_currency, prices)
+    # removes duplicates (TODO: find bug)
+    prices_selection = prices_selection[~prices_selection.index.duplicated(keep='first')]
     prices_selection = _include_indices(prices_selection, balances).ffill()
     extended_balances = _include_indices(balances, prices_selection).ffill()
     return extended_balances, prices_selection
