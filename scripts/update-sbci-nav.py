@@ -17,16 +17,18 @@ _DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE = os.sep.join(('.', 'google-service-account-
 _SHEET_TAB_PRICES = 'Prices'
 _SHEET_TAB_PNL = 'PnL'
 _DEFAULT_DATA_PATH = '.'
+_DEFAULT_REPORTING_CURRENCY = 'ETH'
+_DEFAULT_INCEPTION_DATE = '2017-06-01'
 
 
-def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history, skip_google_update=False,
+def process_spreadsheet(credentials_file, spreadsheet_id, prices, balance_history, skip_google_update=False,
                         pnl_start=None):
     """
 
     :param credentials_file:
     :param spreadsheet_id:
     :param prices:
-    :param pnl_history:
+    :param balance_history:
     :param skip_google_update:
     :param pnl_start:
     :return:
@@ -34,15 +36,14 @@ def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history, s
     header_prices = [field for field in prices.reset_index().columns.tolist() if field != 'index']
     logging.info('uploading {} rows for prices data'.format(prices.count().max()))
     price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
-    logging.info('uploading {} rows for pnl data'.format(pnl_history.count().max()))
-    pnl_history_records = pnl_history.reset_index().sort_values('date', ascending=False)
+    logging.info('uploading {} rows for pnl data'.format(balance_history.count().max()))
+    pnl_history_records = balance_history.sort_values('date', ascending=False)
     if pnl_start is not None:
         pnl_history_records = pnl_history_records[pnl_history_records['date'] > pnl_start]
 
     header_pnl = ['date', 'Portfolio P&L'] + [column for column in pnl_history_records.columns if
                                                   column not in ('date', 'Portfolio P&L')]
     pnl_history_records = pnl_history_records[header_pnl]
-
     if not skip_google_update:
         authorized_http, credentials = authorize_services(credentials_file)
         svc_sheet = gspread.authorize(credentials)
@@ -86,6 +87,19 @@ def main():
                         help=help_msg_data_path.format(_DEFAULT_DATA_PATH),
                         default=_DEFAULT_DATA_PATH
                         )
+    help_msg_data_path = 'reporting currency, using "{}" by default'
+    parser.add_argument('--reporting-currency',
+                        type=str,
+                        help=help_msg_data_path.format(_DEFAULT_REPORTING_CURRENCY),
+                        default=_DEFAULT_REPORTING_CURRENCY
+                        )
+
+    help_msg_data_path = 'inception date, using "{}" by default'
+    parser.add_argument('--inception-date',
+                        type=str,
+                        help=help_msg_data_path.format(_DEFAULT_INCEPTION_DATE),
+                        default=_DEFAULT_INCEPTION_DATE
+                        )
 
     args = parser.parse_args()
     full_creds_path = os.path.abspath(args.google_creds)
@@ -103,10 +117,12 @@ def main():
         raise RuntimeError('not a directory: {}'.format(full_data_path))
 
     flows = pandas.read_pickle(os.sep.join([full_data_path, 'flows.pkl']))
+    trades = pandas.read_pickle(os.sep.join([full_data_path, 'trades.pkl']))
     prices_daily = pandas.read_pickle(os.sep.join([full_data_path, 'day_prices.pkl']))
-    prices_houry = pandas.read_pickle(os.sep.join([full_data_path, 'hour_prices.pkl']))
+    prices_hourly = pandas.read_pickle(os.sep.join([full_data_path, 'hour_prices.pkl']))
     prices_spot = pandas.read_pickle(os.sep.join([full_data_path, 'spot_prices.pkl']))
-    prices = pandas.concat([prices_daily, prices_houry, prices_spot]).sort_values('date', ascending=False)
+    prices = pandas.concat([prices_daily, prices_hourly, prices_spot]).sort_values('date', ascending=False)
+    prices[args.reporting_currency] = 1
     reference_pairs = [(currency.split('.')[0], currency.split('.')[1]) for currency in args.reference_pairs.split(',')]
 
     reporting_pairs = ['/'.join(pair) for pair in reference_pairs]
@@ -114,18 +130,64 @@ def main():
     remaining_columns.discard('date')
     prices_out = prices[['date'] + reporting_pairs + list(remaining_columns)]
 
-    reporting_currency = 'ETH'  # TODO: config param
-    fund_inception_date = datetime(2017, 6, 1)  # TODO: config param
+    reporting_currency = args.reporting_currency
+    fund_inception_date = datetime.strptime(args.inception_date, '%Y-%m-%d')
 
-    balances_by_asset = compute_balances(flows)
+    balances_by_asset = compute_balances(flows, trades)
     extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, prices)
-    balances_in_reporting_currency = prices_selection * extended_balances.shift()
+    balances_in_reporting_currency = prices_selection * extended_balances
     balances_in_reporting_currency = balances_in_reporting_currency.fillna(0)
     balances_in_reporting_currency['Portfolio P&L'] = balances_in_reporting_currency.apply(sum, axis=1)
+    balances_in_reporting_currency.reset_index(inplace=True)
 
+    segments = breakdown_flows(balances_by_asset, balances_in_reporting_currency)
+    # linking segments and normalizing
+    normalizing_factor = segments[0].iloc[0]
+    normalized = pandas.Series()
+    for segment in segments:
+        if not segment.empty:
+            current_normalized = segment * normalizing_factor / segment.iloc[0]
+            normalized = normalized.append(current_normalized)
+            normalizing_factor = segment.iloc[-1]
+
+    balances_in_reporting_currency['Portfolio P&L'] = normalized
+    balances_in_reporting_currency['Portfolio P&L'].ffill(inplace=True)
+    balances_in_reporting_currency['Portfolio P&L'].fillna(1, inplace=True)
     process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices_out, balances_in_reporting_currency,
                         skip_google_update=args.skip_google_update, pnl_start=fund_inception_date)
 
+
+def breakdown_flows(balances_by_asset, balances):
+    logging.info('flows:\n{}'.format(balances_by_asset))
+    flow_dates = balances_by_asset.reset_index()['date']
+    timespans = pandas.DataFrame({'start': flow_dates, 'end': flow_dates.shift(-1)}, columns=['start', 'end'])
+    balances_segments = list()
+    for index, timespan in timespans.iterrows():
+        start_date = timespan['start']
+        end_date = timespan['end']
+        logging.info('{} --> {}'.format(start_date, end_date))
+        if end_date == pandas.NaT:
+            timespan_filter = (balances['date'] >= start_date)
+
+        else:
+            timespan_filter = ((balances['date'] >= start_date)
+                               & (balances['date'] < end_date))
+
+        current_balances_by_asset = balances[timespan_filter]
+        balances_segments.append(current_balances_by_asset['Portfolio P&L'])
+
+    """
+    full_segments = list()
+    for segment, next_segment in zip(balances_segments[:-1], balances_segments[1:]):
+        if not next_segment.empty:
+            next_segment_date = next_segment.iloc[0]['date']
+            last_row = pandas.DataFrame({'date': [next_segment_date]})
+            full_segments.append(segment.append(last_row).ffill().set_index('date')['Portfolio P&L'])
+
+        else:
+            full_segments.append(next_segment.set_index('date')['Portfolio P&L'])
+    """
+    return balances_segments
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')

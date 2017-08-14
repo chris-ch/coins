@@ -30,15 +30,12 @@ def main():
     config_json = json.load(open(args.config, 'rt'))
     api_key = config_json['exchanges']['bittrex']['key']
     secret_key = config_json['exchanges']['bittrex']['secret']
-    bittrex.connect(api_key, secret_key)
-    balances = bittrex.get_balances()
-    deposits = bittrex.get_deposit_history()
-    withdrawals = bittrex.get_withdrawal_history()
-    trades = bittrex.get_order_history()
-    logging.info('balances:\n{}'.format(balances))
-    logging.info('deposits:\n{}'.format(deposits))
-    logging.info('withdrawals:\n{}'.format(withdrawals))
-    logging.info('trades:\n{}'.format(trades))
+
+    flows, trades, currencies = bittrex.retrieve_data(api_key, secret_key)
+
+    logging.info('flows:\n{}\n---------------'.format(flows))
+    logging.info('trades:\n{}\n---------------'.format(trades))
+    logging.info('currencies:\n{}\n---------------'.format(currencies))
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')

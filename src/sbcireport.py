@@ -32,13 +32,14 @@ def _include_indices(target_df, source_df):
     return reindexed.sort_index()
 
 
-def compute_balances(flows):
+def compute_balances(flows, trades):
     """
-
+    Balances by currency.
     :param flows:
+    :param trades:
     :return:
     """
-    flows = flows.set_index('date')
+    flows = flows.append(trades).set_index('date')
     flows_by_asset = flows.pivot(columns='asset', values='amount').apply(pandas.to_numeric)
     balances = flows_by_asset.fillna(0).cumsum()
     return balances
@@ -57,6 +58,8 @@ def extend_balances(reporting_currency, balances, prices):
     prices_selection = prices_selection[~prices_selection.index.duplicated(keep='first')]
     prices_selection = _include_indices(prices_selection, balances).ffill()
     extended_balances = _include_indices(balances, prices_selection).ffill()
+    # removing duplicates
+    extended_balances = extended_balances.groupby('date').first()
     return extended_balances, prices_selection
 
 

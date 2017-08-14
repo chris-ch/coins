@@ -138,7 +138,7 @@ def parse_flows(withdrawals, deposits):
     movements = list()
     for withdrawal in withdrawals:
         item = {
-            'date': datetime.strptime(withdrawal['LastUpdated'], '%Y-%m-%dT%H:%M:%S.%f'),
+            'date': datetime.strptime(withdrawal['Opened'], '%Y-%m-%dT%H:%M:%S.%f'),
             'amount': withdrawal['Amount'] * -1,
             'asset': withdrawal['Currency'],
             'exchange': 'bittrex'

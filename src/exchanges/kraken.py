@@ -146,6 +146,13 @@ def api_call_private(method, options=None):
 
 def get_tradeable_pairs():
     """
+    Creates a DataFrame of pairs data:
+    altname  base   lot  lot_decimals  lot_multiplier  margin_call     margin_stop pair_code  pair_decimals quote
+0   BCHEUR   BCH  unit             8               1           80               40    BCHEUR              4  ZEUR
+1   BCHUSD   BCH  unit             8               1           80               40    BCHUSD              4  ZUSD
+2   BCHXBT   BCH  unit             8               1           80               40    BCHXBT              6  XXBT
+3  DASHEUR  DASH  unit             8               1           80               40   DASHEUR              5  ZEUR
+4  DASHUSD  DASH  unit             8               1           80               40   DASHUSD              5  ZUSD
 
     :return:
     """
