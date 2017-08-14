@@ -44,6 +44,10 @@ def process_spreadsheet(credentials_file, spreadsheet_id, prices, balance_histor
     header_pnl = ['date', 'Portfolio P&L'] + [column for column in pnl_history_records.columns if
                                                   column not in ('date', 'Portfolio P&L')]
     pnl_history_records = pnl_history_records[header_pnl]
+
+    from matplotlib import pyplot
+    pnl_history_records.set_index('date')['Portfolio P&L'].plot()
+    pyplot.show()
     if not skip_google_update:
         authorized_http, credentials = authorize_services(credentials_file)
         svc_sheet = gspread.authorize(credentials)
@@ -142,13 +146,15 @@ def main():
 
     segments = breakdown_flows(balances_by_asset, balances_in_reporting_currency)
     # linking segments and normalizing
-    normalizing_factor = segments[0].iloc[0]
+    previous_level = 1
     normalized = pandas.Series()
     for segment in segments:
         if not segment.empty:
-            current_normalized = segment * normalizing_factor / segment.iloc[0]
+            logging.info('processing segment:\n{}'.format(segment))
+            current_normalized = segment * previous_level / segment.iloc[0]
             normalized = normalized.append(current_normalized)
-            normalizing_factor = segment.iloc[-1]
+            logging.info('normalized segment:\n{}'.format(current_normalized))
+            previous_level = current_normalized.iloc[-1]
 
     balances_in_reporting_currency['Portfolio P&L'] = normalized
     balances_in_reporting_currency['Portfolio P&L'].ffill(inplace=True)
@@ -176,17 +182,6 @@ def breakdown_flows(balances_by_asset, balances):
         current_balances_by_asset = balances[timespan_filter]
         balances_segments.append(current_balances_by_asset['Portfolio P&L'])
 
-    """
-    full_segments = list()
-    for segment, next_segment in zip(balances_segments[:-1], balances_segments[1:]):
-        if not next_segment.empty:
-            next_segment_date = next_segment.iloc[0]['date']
-            last_row = pandas.DataFrame({'date': [next_segment_date]})
-            full_segments.append(segment.append(last_row).ffill().set_index('date')['Portfolio P&L'])
-
-        else:
-            full_segments.append(next_segment.set_index('date')['Portfolio P&L'])
-    """
     return balances_segments
 
 if __name__ == '__main__':
