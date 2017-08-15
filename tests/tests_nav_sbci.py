@@ -7,7 +7,7 @@ from decimal import Decimal
 import pandas
 
 from exchanges.bittrex import parse_flows, parse_trades
-from sbcireport import compute_trades_pnl, compute_balances_pnl, compute_pnl_history, compute_balances, extend_balances
+from sbcireport import compute_trades_pnl, compute_balances, extend_balances
 
 
 class TestNavSBCI(unittest.TestCase):
@@ -32,41 +32,8 @@ class TestNavSBCI(unittest.TestCase):
     def test_trades_pnl(self):
         trades_pnl = compute_trades_pnl('USD', self._test_prices, self._test_trades)
         print(trades_pnl)
-        pnl_xrp = trades_pnl[trades_pnl['asset'] == 'XRP'].tail(1)['total_pnl'].sum()
-        self.assertAlmostEqual(pnl_xrp, 85.514073, places=6)
-
-    def test_balances_pnl(self):
-        flows = parse_flows(self._example_withdrawals, self._example_deposits)
-        balances = compute_balances(flows)
-        balances_pnl = compute_balances_pnl('USD', balances, self._example_prices)
-        self.assertAlmostEqual(balances_pnl.groupby('asset').sum().loc['START'].sum(), -2.136932, places=6)
-
-    def test_pnl_history(self):
-        flows = parse_flows(self._example_withdrawals, self._example_deposits)
-        balances = compute_balances(flows)
-        balances_pnl = compute_balances_pnl('USD', balances, self._example_prices)
-        trades = parse_trades(self._example_order_hist)
-        pnl_history = compute_pnl_history('USD', self._example_prices, balances_pnl, trades)
-        self.assertAlmostEqual(pnl_history.sum()['STRAT'], -470.379621, places=6)
-
-    def test_pnl_history_no_trades(self):
-        flows = parse_flows(self._example_withdrawals, self._example_deposits)
-        balances = compute_balances(flows)
-        balances_pnl = compute_balances_pnl('USD', balances, self._example_prices)
-        trades = pandas.DataFrame()
-        pnl_history = compute_pnl_history('USD', self._example_prices, balances_pnl, trades)
-        self.assertAlmostEqual(pnl_history.sum()['STRAT'], -758.107588, places=6)
-
-    def test_pnl_full(self):
-        balances_by_asset = compute_balances(self._test_flows)
-        reporting_currency = 'EUR'
-        extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, self._test_prices)
-        balances_in_reporting_currency = prices_selection * extended_balances.shift()
-        balances_in_reporting_currency = balances_in_reporting_currency.fillna(0)
-        balances_in_reporting_currency['Portfolio P&L'] = balances_in_reporting_currency.apply(sum, axis=1)
-        balances_pnl = compute_balances_pnl(reporting_currency, balances_by_asset, self._test_prices)
-        pnl_history = compute_pnl_history(reporting_currency, self._test_prices, balances_pnl, self._test_trades)
-        print(self._test_trades)
+        pnl_xrp = trades_pnl['XRP'].tail(1).sum()
+        self.assertAlmostEqual(pnl_xrp, 62.1341177, places=6)
 
     def tearDown(self):
         self._example_order_hist_file.close()

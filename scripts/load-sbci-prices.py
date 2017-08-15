@@ -9,6 +9,7 @@ from cryptocompare import load_crypto_compare_data
 _DEFAULT_EXCHANGE = 'CCCAGG'
 _DEFAULT_DATA_PATH = '.'
 _DEFAULT_TIME_SCALE = 'spot'
+_DEFAULT_REPORTING_CURRENCY = 'ETH'
 
 
 def main():
@@ -40,9 +41,14 @@ def main():
                         help=help_msg_data_path.format(_DEFAULT_TIME_SCALE),
                         default=_DEFAULT_TIME_SCALE
                         )
-
+    help_msg_data_path = 'reporting currency, using "{}" by default'
+    parser.add_argument('--reporting-currency',
+                        type=str,
+                        help=help_msg_data_path.format(_DEFAULT_REPORTING_CURRENCY),
+                        default=_DEFAULT_REPORTING_CURRENCY
+                        )
     args = parser.parse_args()
-    reporting_currency = 'ETH'  # TODO: config param
+    reporting_currency = args.reporting_currency
 
     full_data_path = os.path.abspath(args.data)
     if not os.path.isdir(full_data_path):

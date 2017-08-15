@@ -32,14 +32,13 @@ def _include_indices(target_df, source_df):
     return reindexed.sort_index()
 
 
-def compute_balances(flows, trades):
+def compute_balances(flows):
     """
     Balances by currency.
     :param flows:
-    :param trades:
     :return:
     """
-    flows = flows.append(trades).set_index('date')
+    flows = flows.set_index('date')
     flows_by_asset = flows.pivot(columns='asset', values='amount').apply(pandas.to_numeric)
     balances = flows_by_asset.fillna(0).cumsum()
     return balances
@@ -144,33 +143,70 @@ def compute_trades_pnl(reporting_currency, prices, trades):
     return pnl_by_currency.ffill()
 
 
-def compute_pnl_history(reporting_currency, prices, balances_pnl, trades):
+def breakdown_flows(balances_by_asset, balances):
     """
-    Output format (data expressed in terms of reporting currency):
 
-      asset                                BTC  ETH  EUR  LTC      NEOS     START      STRAT         XRP
-      date
-      2017-07-17 08:00:00.000000 -2.703352e+06  0.0  0.0  0.0  0.005842  0.000238   0.041495  212.745259
-      2017-07-17 09:00:00.000000 -2.766600e+06  0.0  0.0  0.0  0.006815  0.000801   0.067430  219.148809
-      2017-07-17 10:00:00.000000 -2.744735e+06  0.0  0.0  0.0  0.000974 -0.000836  -0.015561  216.213848
-      2017-07-17 10:04:06.200048 -2.744481e+06  0.0  0.0  0.0  0.000000  0.000000   0.000000  216.213848
-      2017-07-17 10:35:09.143000           NaN  NaN  NaN  NaN       NaN       NaN        NaN         NaN
+    :param balances_by_asset:
+    :param balances:
+    :return:
+    """
+    logging.info('flows:\n{}'.format(balances_by_asset))
+    flow_dates = balances_by_asset.reset_index()['date']
+    timespans = pandas.DataFrame({'start': flow_dates, 'end': flow_dates.shift(-1)}, columns=['start', 'end'])
+    balances_segments = list()
+    for index, timespan in timespans.iterrows():
+        start_date = timespan['start']
+        end_date = timespan['end']
+        logging.info('{} --> {}'.format(start_date, end_date))
+        if end_date == pandas.NaT:
+            timespan_filter = (balances['date'] >= start_date)
 
-    :param reporting_currency: str currency code
+        else:
+            timespan_filter = ((balances['date'] >= start_date)
+                               & (balances['date'] < end_date))
+
+        current_balances_by_asset = balances[timespan_filter]
+        balances_segments.append(current_balances_by_asset['Portfolio P&L'])
+
+    return balances_segments
+
+
+def compute_pnl(reporting_currency, flows, prices, trades):
+    """
+
+    :param reporting_currency:
+    :param flows:
     :param prices:
-    :param withdrawals:
-    :param deposits:
     :param trades:
     :return:
     """
-    trades_pnl = compute_trades_pnl(reporting_currency, prices, trades)
-    balances_pnl_by_asset = balances_pnl.groupby(['date', 'asset']).sum().unstack()['pnl']
-    if trades_pnl.empty:
-        pnl_history = balances_pnl_by_asset
+    balances_by_asset = compute_balances(flows)
+    extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, prices)
+    balances_in_reporting_currency = prices_selection * extended_balances
+    balances_in_reporting_currency = balances_in_reporting_currency.fillna(0)
+    balances_in_reporting_currency['Portfolio P&L'] = balances_in_reporting_currency.apply(sum, axis=1)
+    balances_in_reporting_currency.reset_index(inplace=True)
 
-    else:
-        trades_pnl_by_asset = trades_pnl.groupby(['date', 'asset']).sum().unstack()['total_pnl']
-        trades_pnl_by_asset = trades_pnl_by_asset.reindex(columns=balances_pnl_by_asset.columns).fillna(0)
-        pnl_history = balances_pnl_by_asset + trades_pnl_by_asset
+    segments = breakdown_flows(balances_by_asset, balances_in_reporting_currency)
+    # linking segments and normalizing
+    previous_level = 1
+    normalized = pandas.Series()
+    for segment in segments:
+        if not segment.empty:
+            trades_pnl = compute_trades_pnl(reporting_currency, prices, trades)
+            logging.info('trades pnl for segment:\n{}'.format(trades_pnl))
+            logging.info('processing segment:\n{}'.format(segment))
+            current_normalized = segment * previous_level / segment.iloc[0]
+            normalized = normalized.append(current_normalized)
+            logging.info('normalized segment:\n{}'.format(current_normalized))
+            previous_level = current_normalized.iloc[-1]
 
-    return pnl_history.fillna(0)
+    balances_in_reporting_currency['Portfolio P&L'] = normalized
+    balances_in_reporting_currency['Portfolio P&L'].ffill(inplace=True)
+    balances_in_reporting_currency['Portfolio P&L'].fillna(1, inplace=True)
+    logging.info('uploading {} rows for prices data'.format(prices.count().max()))
+
+    logging.info('uploading {} rows for pnl data'.format(balances_in_reporting_currency.count().max()))
+    pnl_history_records = balances_in_reporting_currency.sort_values('date', ascending=False)
+    return pnl_history_records
+

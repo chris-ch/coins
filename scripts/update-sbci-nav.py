@@ -9,8 +9,7 @@ import pandas
 import gspread
 
 from gservices import save_sheet, authorize_services
-from sbcireport import compute_balances, extend_balances
-
+from sbcireport import compute_balances, extend_balances, compute_pnl
 
 _DEFAULT_CONFIG_FILE = os.sep.join(('.', 'config.json'))
 _DEFAULT_GOOGLE_SVC_ACCT_CREDS_FILE = os.sep.join(('.', 'google-service-account-creds.json'))
@@ -21,8 +20,7 @@ _DEFAULT_REPORTING_CURRENCY = 'ETH'
 _DEFAULT_INCEPTION_DATE = '2017-06-01'
 
 
-def process_spreadsheet(credentials_file, spreadsheet_id, prices, balance_history, skip_google_update=False,
-                        pnl_start=None):
+def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history_records):
     """
 
     :param credentials_file:
@@ -34,25 +32,14 @@ def process_spreadsheet(credentials_file, spreadsheet_id, prices, balance_histor
     :return:
     """
     header_prices = [field for field in prices.reset_index().columns.tolist() if field != 'index']
-    logging.info('uploading {} rows for prices data'.format(prices.count().max()))
-    price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
-    logging.info('uploading {} rows for pnl data'.format(balance_history.count().max()))
-    pnl_history_records = balance_history.sort_values('date', ascending=False)
-    if pnl_start is not None:
-        pnl_history_records = pnl_history_records[pnl_history_records['date'] > pnl_start]
-
+    authorized_http, credentials = authorize_services(credentials_file)
+    svc_sheet = gspread.authorize(credentials)
     header_pnl = ['date', 'Portfolio P&L'] + [column for column in pnl_history_records.columns if
                                                   column not in ('date', 'Portfolio P&L')]
     pnl_history_records = pnl_history_records[header_pnl]
-
-    from matplotlib import pyplot
-    pnl_history_records.set_index('date')['Portfolio P&L'].plot()
-    pyplot.show()
-    if not skip_google_update:
-        authorized_http, credentials = authorize_services(credentials_file)
-        svc_sheet = gspread.authorize(credentials)
-        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
-        save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PNL, header_pnl, pnl_history_records.to_dict(orient='records'))
+    price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
+    save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
+    save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PNL, header_pnl, pnl_history_records.to_dict(orient='records'))
 
 
 def main():
@@ -137,52 +124,17 @@ def main():
     reporting_currency = args.reporting_currency
     fund_inception_date = datetime.strptime(args.inception_date, '%Y-%m-%d')
 
-    balances_by_asset = compute_balances(flows, trades)
-    extended_balances, prices_selection = extend_balances(reporting_currency, balances_by_asset, prices)
-    balances_in_reporting_currency = prices_selection * extended_balances
-    balances_in_reporting_currency = balances_in_reporting_currency.fillna(0)
-    balances_in_reporting_currency['Portfolio P&L'] = balances_in_reporting_currency.apply(sum, axis=1)
-    balances_in_reporting_currency.reset_index(inplace=True)
+    pnl_history_records = compute_pnl(reporting_currency, flows, prices, trades)
+    if fund_inception_date is not None:
+        pnl_history_records = pnl_history_records[pnl_history_records['date'] > fund_inception_date]
 
-    segments = breakdown_flows(balances_by_asset, balances_in_reporting_currency)
-    # linking segments and normalizing
-    previous_level = 1
-    normalized = pandas.Series()
-    for segment in segments:
-        if not segment.empty:
-            logging.info('processing segment:\n{}'.format(segment))
-            current_normalized = segment * previous_level / segment.iloc[0]
-            normalized = normalized.append(current_normalized)
-            logging.info('normalized segment:\n{}'.format(current_normalized))
-            previous_level = current_normalized.iloc[-1]
+    if not args.skip_google_update:
+        process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices_out, pnl_history_records)
 
-    balances_in_reporting_currency['Portfolio P&L'] = normalized
-    balances_in_reporting_currency['Portfolio P&L'].ffill(inplace=True)
-    balances_in_reporting_currency['Portfolio P&L'].fillna(1, inplace=True)
-    process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices_out, balances_in_reporting_currency,
-                        skip_google_update=args.skip_google_update, pnl_start=fund_inception_date)
-
-
-def breakdown_flows(balances_by_asset, balances):
-    logging.info('flows:\n{}'.format(balances_by_asset))
-    flow_dates = balances_by_asset.reset_index()['date']
-    timespans = pandas.DataFrame({'start': flow_dates, 'end': flow_dates.shift(-1)}, columns=['start', 'end'])
-    balances_segments = list()
-    for index, timespan in timespans.iterrows():
-        start_date = timespan['start']
-        end_date = timespan['end']
-        logging.info('{} --> {}'.format(start_date, end_date))
-        if end_date == pandas.NaT:
-            timespan_filter = (balances['date'] >= start_date)
-
-        else:
-            timespan_filter = ((balances['date'] >= start_date)
-                               & (balances['date'] < end_date))
-
-        current_balances_by_asset = balances[timespan_filter]
-        balances_segments.append(current_balances_by_asset['Portfolio P&L'])
-
-    return balances_segments
+    else:
+        from matplotlib import pyplot
+        pnl_history_records.set_index('date')['Portfolio P&L'].plot()
+        pyplot.show()
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')
