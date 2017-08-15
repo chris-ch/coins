@@ -35,7 +35,7 @@ def process_spreadsheet(credentials_file, spreadsheet_id, prices, pnl_history_re
     authorized_http, credentials = authorize_services(credentials_file)
     svc_sheet = gspread.authorize(credentials)
     header_pnl = ['date', 'Portfolio P&L'] + [column for column in pnl_history_records.columns if
-                                                  column not in ('date', 'Portfolio P&L')]
+                                              column not in ('date', 'Portfolio P&L')]
     pnl_history_records = pnl_history_records[header_pnl]
     price_records = prices.sort_values('date', ascending=False).to_dict(orient='records')
     save_sheet(svc_sheet, spreadsheet_id, _SHEET_TAB_PRICES, header_prices, price_records)
@@ -114,13 +114,6 @@ def main():
     prices_spot = pandas.read_pickle(os.sep.join([full_data_path, 'spot_prices.pkl']))
     prices = pandas.concat([prices_daily, prices_hourly, prices_spot]).sort_values('date', ascending=False)
     prices[args.reporting_currency] = 1
-    reference_pairs = [(currency.split('.')[0], currency.split('.')[1]) for currency in args.reference_pairs.split(',')]
-
-    reporting_pairs = ['/'.join(pair) for pair in reference_pairs]
-    remaining_columns = set(prices.columns).difference(set(reporting_pairs))
-    remaining_columns.discard('date')
-    prices_out = prices[['date'] + reporting_pairs + list(remaining_columns)]
-
     reporting_currency = args.reporting_currency
     fund_inception_date = datetime.strptime(args.inception_date, '%Y-%m-%d')
 
@@ -129,12 +122,19 @@ def main():
         pnl_history_records = pnl_history_records[pnl_history_records['date'] > fund_inception_date]
 
     if not args.skip_google_update:
+        reference_pairs = [(currency.split('.')[0], currency.split('.')[1]) for currency in
+                           args.reference_pairs.split(',')]
+        reporting_pairs = ['/'.join(pair) for pair in reference_pairs]
+        remaining_columns = set(prices.columns).difference(set(reporting_pairs))
+        remaining_columns.discard('date')
+        prices_out = prices[['date'] + reporting_pairs + list(remaining_columns)]
         process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices_out, pnl_history_records)
 
     else:
         from matplotlib import pyplot
         pnl_history_records.set_index('date')['Portfolio P&L'].plot()
         pyplot.show()
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(name)s:%(levelname)s:%(message)s')

@@ -62,29 +62,6 @@ def extend_balances(reporting_currency, balances, prices):
     return extended_balances, prices_selection
 
 
-def compute_balances_pnl(reporting_currency, balances, prices):
-    """
-    Output format (data expressed in terms of reporting currency):
-
-              asset                       date  pnl
-        10947   XRP 2017-07-17 09:00:00.000000  0.0
-        10948   XRP 2017-07-17 10:00:00.000000  0.0
-        10949   XRP 2017-07-17 10:04:06.200048  0.0
-        10950   XRP 2017-07-17 10:35:09.143000  0.0
-        10951   XRP 2017-07-17 10:35:09.143000  0.0
-
-    :param reporting_currency:
-    :param prices:
-    :param balances:
-    :return:
-    """
-    extended_balances, prices_selection = extend_balances(reporting_currency, balances, prices)
-    performances = prices_selection.diff() * extended_balances.shift()
-    cum_perf = performances.cumsum()
-    formatted = cum_perf.unstack().reset_index().fillna(0).rename(columns={'level_0': 'asset', 0: 'pnl'})
-    return formatted
-
-
 def compute_trades_pnl(reporting_currency, prices, trades):
     """
     Trades P&L by asset expressed in the reporting currency.
