@@ -8,8 +8,8 @@ Feature: P&L Calculation
          | 2017-07-01 05:30:00  | 50000    | ETH       |
          | 2017-07-15 08:10:00  | -50000   | ETH       |
     And the reference currency is ETH
-    And as of date 2017/07/31 00:00:00
-    Then I should get
+    And as of date is 2017/07/31 00:00:00
+    Then P&L should be
          | date                 | P&L  |
          | 2017-07-01 01:05:00  | 0    |
 
@@ -20,7 +20,7 @@ Feature: P&L Calculation
          | 2017-07-01 05:30:00  | 50000    | USD       |
          | 2017-07-15 08:10:00  | -50000   | USD       |
     And the reference currency is USD
-    And as of date 2017/07/31 00:00:00
+    And as of date is 2017/07/31 00:00:00
     And following trades are performed
          | date                 | amount   | traded currency  | using currency  | at price |
          | 2017-07-01 01:08:30  | 50       | EUR              | USD             | 1.10     |
@@ -48,7 +48,7 @@ Feature: P&L Calculation
          | 2017-07-02 12:00:00  | JPY        | 111             |
          | 2017-07-03 00:00:00  | JPY        | 110             |
          | 2017-07-03 12:00:00  | JPY        | 109             |
-    Then I should get
+    Then P&L should be
          | date                 | P&L  |
          | 2017-07-01 01:08:30  | 0    |
          | 2017-07-01 02:15:00  | 0    |
