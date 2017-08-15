@@ -128,6 +128,7 @@ def main():
         remaining_columns = set(prices.columns).difference(set(reporting_pairs))
         remaining_columns.discard('date')
         prices_out = prices[['date'] + reporting_pairs + list(remaining_columns)]
+        logging.info('uploading {} rows for prices data'.format(prices.count().max()))
         process_spreadsheet(args.google_creds, config_json['target_sheet_id'], prices_out, pnl_history_records)
 
     else:

@@ -181,9 +181,6 @@ def compute_pnl(reporting_currency, flows, prices, trades):
     balances_in_reporting_currency['Portfolio P&L'] = normalized
     balances_in_reporting_currency['Portfolio P&L'].ffill(inplace=True)
     balances_in_reporting_currency['Portfolio P&L'].fillna(1, inplace=True)
-    logging.info('uploading {} rows for prices data'.format(prices.count().max()))
-
-    logging.info('uploading {} rows for pnl data'.format(balances_in_reporting_currency.count().max()))
     pnl_history_records = balances_in_reporting_currency.sort_values('date', ascending=False)
     return pnl_history_records
 

@@ -6,8 +6,7 @@ from decimal import Decimal
 
 import pandas
 
-from exchanges.bittrex import parse_flows, parse_trades
-from sbcireport import compute_trades_pnl, compute_balances, extend_balances
+from sbcireport import compute_trades_pnl, compute_pnl
 
 
 class TestNavSBCI(unittest.TestCase):
@@ -31,8 +30,13 @@ class TestNavSBCI(unittest.TestCase):
 
     def test_trades_pnl(self):
         trades_pnl = compute_trades_pnl('USD', self._test_prices, self._test_trades)
-        print(trades_pnl)
         pnl_xrp = trades_pnl['XRP'].tail(1).sum()
+        self.assertAlmostEqual(pnl_xrp, 62.1341177, places=6)
+
+    def test_total_pnl(self):
+        pnl = compute_pnl('USD', self._test_flows, self._test_prices, self._test_trades)
+        print(pnl)
+        pnl_xrp = pnl['XRP'].tail(1).sum()
         self.assertAlmostEqual(pnl_xrp, 62.1341177, places=6)
 
     def tearDown(self):
